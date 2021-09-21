@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "lib": ["ES2019", "DOM"],
-    "target": "ES2019",
+    "lib": ["ES2020", "DOM"],
+    "target": "ES2020",
     "rootDir": ".",
     "outDir": ".tsbuild",
     "module": "commonjs",
@@ -12,8 +12,7 @@
     "baseUrl": ".",
     "sourceMap": false,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node", "webdriverio/async", "@wdio/mocha-framework"]
+    "types": ["node"]
   },
-  "include": ["./test/**/*.ts", "./*.ts"],
   "exclude": ["node_modules"]
 }
