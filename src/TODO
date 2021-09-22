@@ -1,0 +1,2 @@
+- Update Minesweeper title to not have a white background
+- Fix generating on tile activation (checking tile with 99 bombs often detonates a bomb on first try)

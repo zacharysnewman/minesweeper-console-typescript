@@ -2,9 +2,9 @@ export class Coords {
   public readonly x: number = 0;
   public readonly y: number = 0;
 
-  constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
+  constructor(x?: number, y?: number) {
+    this.x = x === undefined ? 0 : x;
+    this.y = y === undefined ? 0 : y;
   }
 
   public toString(): string {
@@ -13,7 +13,9 @@ export class Coords {
 
   public static zero: Coords = new Coords(0, 0);
 
-  // public bool Equals(Coords other) => this.x ===other.x && this.y ===other.y;
+  public equals(other: Coords): Boolean {
+    return this.x === other.x && this.y === other.y;
+  }
   // public override bool Equals(object obj) => this.Equals((Coords)obj);
   // public override int GetHashCode() => base.GetHashCode();
 

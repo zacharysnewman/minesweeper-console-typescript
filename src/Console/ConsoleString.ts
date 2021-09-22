@@ -16,22 +16,10 @@ export class ConsoleString {
     this.backgroundColor = backgroundColor;
   }
 
-  public write(): void {
-    // let prevForegroundColor = chalk.ForegroundColor;
-    // var prevBackgroundColor = chalk.BackgroundColor;
-
-    // if (this.foregroundColor !== Color.None)
-    //     Console.ForegroundColor = (ConsoleColor)(int)this.foregroundColor;
-    // if (this.backgroundColor !== Color.None)
-    //     Console.BackgroundColor = (ConsoleColor)(int)this.backgroundColor;
-
-    // let chalky : () => (str: string) => string =
+  public toString(): string {
     let fg = chalk[this.foregroundColor];
     let bg = chalk[this.backgroundColor];
-    console.log(fg(bg("message")));
-
-    // Console.ForegroundColor = prevForegroundColor;
-    // Console.BackgroundColor = prevBackgroundColor;
+    return fg(bg(this.text));
   }
 
   // public static implicit operator ConsoleString((string, Color, Color) tuple)

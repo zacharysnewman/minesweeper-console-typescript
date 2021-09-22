@@ -1,39 +1,34 @@
-import { MapInformation } from "./../MapGeneration/MapInformation";
-import { Shuffler } from "./../MapGeneration/Shuffler";
-import { tileMapToTileArray } from "./../Typescript/CollectionConversions";
+import { TileGridInformation } from "../TileGridGeneration/TileGridInformation";
+import { Shuffler } from "../TileGridGeneration/Shuffler";
 import { Coords } from "./Coords";
 import { Tile } from "./Tile";
 import { TileState } from "./TileState";
 
 export class TileGrid {
-  // previously Map
-  public readonly MapInfo: MapInformation;
-  public readonly Tiles: Map<Coords, Tile>;
+  public readonly tileGridInfo: TileGridInformation;
+  public readonly tileArray: Tile[];
 
-  constructor(mapInfo: MapInformation, tiles: Map<Coords, Tile>) {
-    this.MapInfo = mapInfo;
-    this.Tiles = tiles;
+  constructor(tileGridInfo?: TileGridInformation, tiles?: Tile[]) {
+    this.tileGridInfo =
+      tileGridInfo === undefined ? new TileGridInformation() : tileGridInfo;
+    this.tileArray = tiles === undefined ? [] : tiles;
   }
 
-  // public bool Equals(TileMap other) => this.Tiles ===other.Tiles;
-  // public override bool Equals(Object other) => this.Equals((TileMap)other);
-  // public override int GetHashCode() => base.GetHashCode();
-  // public static bool operator ==(TileMap a, TileMap b) => a.Equals(b);
-  // public static bool operator !==(TileMap a, TileMap b) => !a.Equals(b);
-
-  // public static GenerateNewMap(mapInfo : MapInformation, doExcludeTile: Boolean = false, excludedTileCoords = Coords.zero) : TileMap
-  // {
-  //     return TileMap.GenerateNewMap(mapInfo, doExcludeTile, excludedTileCoords);
+  // public equals(other: TileGrid): Boolean {
+  //   return (
+  //     this.tileGridInfo.equals(other.tileGridInfo) &&
+  //     this.tiles.equals(other.tiles)
+  //   );
   // }
 
-  public static generateNewMap(
-    mapInfo: MapInformation,
+  public static generateNewTileGrid(
+    tileGridInfo: TileGridInformation,
     doExcludeTile: Boolean = false,
     excludedTileCoords = Coords.zero
   ): TileGrid {
     const allTiles: Tile[] = new Array<Tile>();
-    for (let x = 0; x < mapInfo.Width; x++) {
-      for (let y = 0; y < mapInfo.Height; y++) {
+    for (let x = 0; x < tileGridInfo.Width; x++) {
+      for (let y = 0; y < tileGridInfo.Height; y++) {
         var newTileCoords = new Coords(x, y);
         if (doExcludeTile && excludedTileCoords == newTileCoords) {
           continue;
@@ -42,7 +37,7 @@ export class TileGrid {
       }
     }
     const shuffledTiles = Shuffler.shuffle(allTiles);
-    let bombsToAdd = mapInfo.Bombs;
+    let bombsToAdd = tileGridInfo.Bombs;
     const tilesWithBombs = shuffledTiles.map((x) =>
       bombsToAdd-- > 0 ? x.with(undefined, undefined, true) : x
     );
@@ -51,55 +46,59 @@ export class TileGrid {
       tilesWithBombs.push(new Tile(excludedTileCoords));
     }
 
-    return new TileGrid(
-      mapInfo,
-      new Map(tilesWithBombs.map((tile) => [tile.coords, tile]))
-    );
+    return new TileGrid(tileGridInfo, tilesWithBombs);
   }
 
   canActivateTile(coords: Coords): Boolean {
-    return this.Tiles.has(coords);
+    return this.tileArray.some((x) => x.coords.equals(coords));
   }
-  withActivatedTile(coords: Coords, flagMode: Boolean): TileGrid {
-    if (
-      tileMapToTileArray(this.Tiles).every(
-        (x) => x.tileState === TileState.hidden
-      )
-    ) {
-      let newMap = TileGrid.generateNewMap(this.MapInfo, true, coords);
-      let newTiles = new Map<Coords, Tile>(newMap.Tiles);
-      newTiles = TileGrid.activate(newTiles, coords, flagMode, true);
-      return new TileGrid(newMap.MapInfo, newTiles);
-    } else {
-      let newTiles = new Map<Coords, Tile>(this.Tiles);
-      newTiles = TileGrid.activate(newTiles, coords, flagMode, true);
 
-      return new TileGrid(this.MapInfo, newTiles);
+  withActivatedTile(coords: Coords, flagMode: Boolean): TileGrid {
+    if (this.tileArray.every((x) => x.tileState === TileState.hidden)) {
+      let newTileGrid = TileGrid.generateNewTileGrid(
+        this.tileGridInfo,
+        true,
+        coords
+      );
+      let newTiles = [...newTileGrid.tileArray];
+      newTiles = TileGrid.activate(newTiles, coords, flagMode, true);
+      return new TileGrid(newTileGrid.tileGridInfo, newTiles);
+    } else {
+      let newTiles = [...this.tileArray];
+      newTiles = TileGrid.activate(newTiles, coords, flagMode, true);
+      return new TileGrid(this.tileGridInfo, newTiles);
     }
   }
 
   public static activate(
-    tiles: Map<Coords, Tile>,
+    tiles: Tile[],
     coords: Coords,
     flagMode: Boolean,
     primaryActivation: Boolean = false
-  ): Map<Coords, Tile> {
-    let newTiles = new Map<Coords, Tile>(tiles);
-    let tile = newTiles.get(coords) as Tile;
+  ): Tile[] {
+    let newTiles = [...tiles];
+    let tile = newTiles.find((t) => t.coords.equals(coords)) as Tile;
     let nearbyActivateableTiles = TileGrid.getNearbyTiles(
       newTiles,
       tile.coords
     ).filter((x) => x.tileState === TileState.hidden);
 
+    const tileIndex = newTiles.findIndex((x) => x.coords.equals(coords));
+
     switch (tile.tileState) {
       case TileState.hidden:
-        newTiles.set(
-          coords,
-          tile.with(
-            undefined,
-            flagMode ? TileState.flagged : TileState.revealed
-          )
+        newTiles[tileIndex] = tile.with(
+          undefined,
+          flagMode ? TileState.flagged : TileState.revealed
         );
+
+        // newTiles.set(
+        //   coords,
+        //   tile.with(
+        //     undefined,
+        //     flagMode ? TileState.flagged : TileState.revealed
+        //   )
+        // );
 
         if (
           !flagMode &&
@@ -110,12 +109,17 @@ export class TileGrid {
         }
         break;
       case TileState.flagged:
-        newTiles.set(
-          coords,
-          flagMode
-            ? tile.with(undefined, TileState.hidden)
-            : (newTiles.get(coords) as Tile)
+        newTiles[tileIndex] = tile.with(
+          undefined,
+          flagMode ? TileState.flagged : TileState.revealed
         );
+
+        // newTiles.set(
+        //   coords,
+        //   flagMode
+        //     ? tile.with(undefined, TileState.hidden)
+        //     : (newTiles.find((x) => x.coords.equals(coords)) as Tile)
+        // );
         break;
       case TileState.revealed:
         if (
@@ -132,46 +136,32 @@ export class TileGrid {
     return newTiles;
   }
 
-  public static activateAll(
-    tiles: Map<Coords, Tile>,
-    nearbyTiles: Tile[]
-  ): Map<Coords, Tile> {
-    let newTiles = new Map<Coords, Tile>(tiles);
+  public static activateAll(tiles: Tile[], nearbyTiles: Tile[]): Tile[] {
+    let newTiles = [...tiles];
     for (let t of nearbyTiles) {
       newTiles =
-        (newTiles.get(t.coords) as Tile).tileState !== TileState.revealed
+        (newTiles.find((x) => x.coords.equals(t.coords)) as Tile).tileState !==
+        TileState.revealed
           ? TileGrid.activate(newTiles, t.coords, false)
           : newTiles;
     }
     return newTiles;
   }
 
-  public static isNotNearAnyBombs(
-    tiles: Map<Coords, Tile>,
-    coords: Coords
-  ): Boolean {
+  public static isNotNearAnyBombs(tiles: Tile[], coords: Coords): Boolean {
     return TileGrid.getNearbyBombCount(tiles, coords) === 0;
   }
-  public static getNearbyBombCount(
-    tiles: Map<Coords, Tile>,
-    coords: Coords
-  ): number {
+  public static getNearbyBombCount(tiles: Tile[], coords: Coords): number {
     return TileGrid.getNearbyTiles(tiles, coords).filter((x) => x.isBomb)
       .length;
   }
-  public static getNearbyFlagCount(
-    tiles: Map<Coords, Tile>,
-    coords: Coords
-  ): number {
+  public static getNearbyFlagCount(tiles: Tile[], coords: Coords): number {
     return TileGrid.getNearbyTiles(tiles, coords).filter(
       (x) => x.tileState === TileState.flagged
     ).length;
   }
 
-  private static getNearbyTiles(
-    tiles: Map<Coords, Tile>,
-    coords: Coords
-  ): Tile[] {
+  private static getNearbyTiles(tiles: Tile[], coords: Coords): Tile[] {
     let col = coords.x;
     let row = coords.y;
 
@@ -190,12 +180,9 @@ export class TileGrid {
       .map((x) => x as Tile);
   }
 
-  private static tryGetTile(
-    tiles: Map<Coords, Tile>,
-    coords: Coords
-  ): Tile | undefined {
+  private static tryGetTile(tiles: Tile[], coords: Coords): Tile | undefined {
     try {
-      return tiles.get(coords);
+      return tiles.find((x) => x.coords.equals(coords));
     } catch {
       return undefined;
     }

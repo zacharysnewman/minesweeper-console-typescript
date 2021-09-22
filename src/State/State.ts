@@ -1,31 +1,27 @@
 import { EventAggregator } from "./../Events/EventAggregator";
 import { StateChangedEvent } from "./../Events/Events";
-import { MapInformation } from "./../MapGeneration/MapInformation";
 import { Coords } from "./Coords";
 import { TileGrid } from "./TileGrid";
 
 export class State {
-  public readonly mapInfo: MapInformation;
-  public readonly map: TileGrid;
+  public readonly tileGrid: TileGrid;
 
-  constructor(map: TileGrid) {
-    this.map = map;
-    this.mapInfo = map.MapInfo;
+  constructor(tileGrid?: TileGrid) {
+    if (tileGrid === undefined) {
+      tileGrid = new TileGrid();
+    }
+    this.tileGrid = tileGrid;
     EventAggregator.get(StateChangedEvent).publish(this);
   }
 
-  public withMap(newMap: TileGrid): State {
-    return this.map == newMap ? this : new State(newMap);
+  public withTileGrid(newTileGrid: TileGrid): State {
+    return /*this.tileGrid.equals(newTileGrid) ? this :*/ new State(
+      newTileGrid
+    );
   }
   public withActivatedTile(coords: Coords, flagMode: Boolean): State {
-    return this.map.canActivateTile(coords)
-      ? this.withMap(this.map.withActivatedTile(coords, flagMode))
+    return this.tileGrid.canActivateTile(coords)
+      ? this.withTileGrid(this.tileGrid.withActivatedTile(coords, flagMode))
       : this;
   }
-
-  // public void Deconstruct(out MapInformation mapInfo, out Dictionary<Coords, Tile> tiles)
-  // {
-  //     mapInfo = this.map.MapInfo;
-  //     tiles = this.map.Tiles;
-  // }
 }

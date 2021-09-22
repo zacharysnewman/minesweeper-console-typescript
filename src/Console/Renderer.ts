@@ -3,18 +3,18 @@ import { StateChangedEvent } from "./../Events/Events";
 import { State } from "./../State/State";
 import { Color } from "./Color";
 import { ConsoleString } from "./ConsoleString";
-import { tileMapToTileArray } from "./../Typescript/CollectionConversions";
 import { CoolRendering } from "./CoolRendering";
 import { WinLoseStatus } from "./WinLoseStatus";
 import { TileState } from "./../State/TileState";
 import { Tile } from "./../State/Tile";
 import { Coords } from "./../State/Coords";
 import { TileGrid } from "./../State/TileGrid";
+import chalk from "chalk";
 
 export abstract class Renderer {
   private static readonly Hidden: ConsoleString = new ConsoleString(
     "#",
-    Color.None,
+    Color.none,
     Color.bgNone
   );
   private static readonly Flagged: ConsoleString = new ConsoleString(
@@ -24,8 +24,8 @@ export abstract class Renderer {
   );
   private static readonly BombRevealed: ConsoleString = new ConsoleString(
     "B",
-    Color.blackBright,
-    Color.bgGray
+    Color.none,
+    Color.bgNone
   );
   private static readonly BombIncorrect: ConsoleString = new ConsoleString(
     "X",
@@ -34,20 +34,21 @@ export abstract class Renderer {
   );
   private static readonly BombDetonated: ConsoleString = new ConsoleString(
     "B",
-    Color.blackBright,
+    Color.none,
     Color.bgRedBright
   );
   private static readonly NearbyBombs: ConsoleString[] = [
-    new ConsoleString(" ", Color.whiteBright, Color.bgNone),
+    new ConsoleString(" ", Color.white, Color.bgNone),
     new ConsoleString("1", Color.blueBright, Color.bgNone),
     new ConsoleString("2", Color.greenBright, Color.bgNone),
     new ConsoleString("3", Color.redBright, Color.bgNone),
     new ConsoleString("4", Color.blue, Color.bgNone),
     new ConsoleString("5", Color.red, Color.bgNone),
     new ConsoleString("6", Color.cyanBright, Color.bgNone),
-    new ConsoleString("7", Color.blackBright, Color.bgNone),
+    new ConsoleString("7", Color.none, Color.bgNone),
     new ConsoleString("8", Color.gray, Color.bgNone),
   ];
+
   private static readonly Logo: ConsoleString = new ConsoleString(
     CoolRendering.MinesweeperLogoSmall,
     Color.yellowBright,
@@ -58,68 +59,109 @@ export abstract class Renderer {
     "Commands:\n" +
     "check <row><col> (Ex: 'check a3' or 'g6') [Reveals a tile] \n" +
     "flag <row><col> (Ex: 'flag a3' or 'f g6') [Flags a tile]\n" +
-    "new [Generates a new map]\n" +
-    "new <bombs> (Ex: 'new 15') [Generates a new map with X bombs]";
+    "new [Generates a new tile grid]\n" +
+    "new <bombs> (Ex: 'new 15') [Generates a new tile grid with X bombs]";
 
   public static init(): void {
     EventAggregator.get(StateChangedEvent).subscribe(Renderer.onStateChanged);
   }
 
   public static onStateChanged(newState: State): void {
-    const { MapInfo, Tiles } = newState.map;
-    var tiles = tileMapToTileArray(Tiles);
-    var winLoseStatus = Renderer.WinOrLoseCheck(tiles);
+    const { tileGridInfo, tileArray } = newState.tileGrid;
+    // const tileArray = tileMapToTileArray(tiles);
+    const winLoseStatus = Renderer.WinOrLoseCheck(tileArray);
 
-    console.clear();
+    //console.clear();
+    // console.log("Tiles: ", tiles);
+
+    let output: string = "";
 
     // Console.ForegroundColor = ConsoleColor.Yellow;
 
-    this.Logo.write();
+    // Renderer.Logo.write();
+    output += Renderer.Logo;
     // console.log(CoolRendering.MinesweeperLogoSmall);
 
     // Console.ForegroundColor = ConsoleColor.Black;
     // Console.BackgroundColor = ConsoleColor.White;
 
-    console.log("\n                                               \n     ");
-    for (let i = 0; i < 10; i++) {
-      console.log(i + "   ");
-    }
-    console.log("  \n");
+    // console.log(
+    let gameBoard = "";
 
-    for (let x = 0; x < MapInfo.Width; x++) {
-      console.log("   |---|---|---|---|---|---|---|---|---|---|   \n");
-      console.log(" " + "abcdefghijklmnopqrstuvwxyz".toUpperCase()[x] + " | ");
-      for (let y = 0; y < MapInfo.Height; y++) {
-        Renderer.GetTileString(
-          Tiles,
-          Tiles.get(new Coords(x, y)) as Tile,
+    gameBoard += "\n                                               \n     ";
+    for (let i = 0; i < 10; i++) {
+      // console.log(
+      gameBoard += i + "   ";
+    }
+    // console.log(
+    gameBoard += "  \n";
+
+    // console.log("Game board: ", tiles);
+    // console.log(tileArray);
+    // let c = new Coords(0, 1);
+    // let testMap = new Map<[number, number], string>();
+    // testMap.set([0, 0], "tile1");
+    // testMap.set([0, 1], "test2");
+    // console.log(testMap.has([0, 0]));
+    // console.log(
+    //   new Coords() == new Coords(),
+    //   new Coords().equals(new Coords())
+    // );
+
+    for (let x = 0; x < tileGridInfo.Width; x++) {
+      // console.log(
+      gameBoard += "   |---|---|---|---|---|---|---|---|---|---|   \n";
+      // console.log(
+      gameBoard += " " + "abcdefghijklmnopqrstuvwxyz".toUpperCase()[x] + " | ";
+      for (let y = 0; y < tileGridInfo.Height; y++) {
+        const tile = tileArray.find((t) =>
+          t.coords.equals(new Coords(x, y))
+        ) as Tile;
+        // console.log(
+        gameBoard += Renderer.GetTileString(
+          //chalk.red("#");
+          tileArray,
+          tile,
           winLoseStatus
-        ).write();
-        console.log(" | ");
+        );
+        // console.log(
+        gameBoard += " | ";
       }
-      console.log("abcdefghijklmnopqrstuvwxyz".toUpperCase()[x]);
-      console.log(" \n");
+      // console.log(
+      gameBoard += "abcdefghijklmnopqrstuvwxyz".toUpperCase()[x];
+      // console.log(
+      gameBoard += " \n";
     }
-    console.log("   |---|---|---|---|---|---|---|---|---|---|   \n     ");
+    // console.log(
+    gameBoard += "   |---|---|---|---|---|---|---|---|---|---|   \n     ";
     for (let i = 0; i < 10; i++) {
-      console.log(i + "   ");
+      // console.log(
+      gameBoard += i + "   ";
     }
-    console.log("  \n                                               \n\n");
+    // console.log(
+    gameBoard += "  \n                                               \n\n";
 
+    output += chalk.bgWhite(chalk.black(gameBoard));
     // Console.ResetColor();
 
-    console.log(Renderer.CommandList);
-    console.log("\n\n");
-    var winOrLoseStatus = Renderer.WinOrLoseCheck(tiles);
+    // console.log(
+    output += Renderer.CommandList;
+    // console.log(
+    output += "\n\n";
+    var winOrLoseStatus = Renderer.WinOrLoseCheck(tileArray);
     var gameStatus =
       winOrLoseStatus === WinLoseStatus.win
         ? "You Won!"
         : winLoseStatus === WinLoseStatus.lose
         ? "You Lost!"
         : "In Progress...";
-    console.log(`Game Status: ${gameStatus}`);
+    // console.log(
+    output += `Game Status: ${gameStatus}`;
 
-    console.log("\n\nEnter Command: ");
+    // console.log(
+    output += "\n\nEnter Command: ";
+
+    console.log(output);
   }
 
   private static WinOrLoseCheck(tiles: Tile[]): WinLoseStatus {
@@ -140,7 +182,7 @@ export abstract class Renderer {
   }
 
   private static GetTileString(
-    tilesDict: Map<Coords, Tile>,
+    tilesArray: Tile[],
     tile: Tile,
     winLoseStatus: WinLoseStatus
   ): ConsoleString {
@@ -157,7 +199,7 @@ export abstract class Renderer {
         if (tile.isBomb) {
           tileString = Renderer.BombDetonated;
         } else {
-          var bombCount = TileGrid.getNearbyBombCount(tilesDict, tile.coords);
+          var bombCount = TileGrid.getNearbyBombCount(tilesArray, tile.coords);
           tileString = Renderer.NearbyBombs[bombCount];
         }
         break;

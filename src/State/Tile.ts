@@ -7,9 +7,9 @@ export class Tile {
   public readonly isBomb: Boolean;
 
   constructor(coords?: Coords, tileState?: TileState, isBomb?: Boolean) {
-    var newCoords = coords !== undefined ? coords : Coords.zero;
-    var newTileState = tileState !== undefined ? tileState : TileState.hidden;
-    var newIsBomb = isBomb !== undefined ? isBomb : false;
+    var newCoords = coords === undefined ? Coords.zero : coords;
+    var newTileState = tileState === undefined ? TileState.hidden : tileState;
+    var newIsBomb = isBomb === undefined ? false : isBomb;
     this.coords = newCoords;
     this.tileState = newTileState;
     this.isBomb = newIsBomb;
@@ -26,7 +26,7 @@ export class Tile {
     return new Tile(newCoords, newTileState, newIsBomb);
   }
 
-  public ToString(): string {
+  public toString(): string {
     return `{ (${this.coords.x},${this.coords.y}), ${this.isBomb} }`;
   }
 }

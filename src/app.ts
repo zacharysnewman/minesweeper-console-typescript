@@ -1,32 +1,35 @@
 ﻿import { CommandType } from "./Console/CommandType";
 import { Renderer } from "./Console/Renderer";
 import { EventAggregator } from "./Events/EventAggregator";
-import { ActivateTileEvent, GenerateMapEvent } from "./Events/Events";
-import { MapInformation } from "./MapGeneration/MapInformation";
+import { ActivateTileEvent, GenerateTileGridEvent } from "./Events/Events";
+import { TileGridInformation } from "./TileGridGeneration/TileGridInformation";
 import { Coords } from "./State/Coords";
 import { Game } from "./State/Game";
-import * as Readline from "readline";
-import { mainModule } from "process";
-const readline = Readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
+// import * as Readline from "readline";
+// const readline = Readline.createInterface({
+//   input: process.stdin,
+//   output: process.stdout,
+// });
+import readlineSync from "readline-sync";
 
 class App {
-  private static mapInfo: MapInformation = new MapInformation(10, 10, 10);
+  private static tileGridInfo: TileGridInformation = new TileGridInformation(
+    10,
+    10,
+    10
+  );
   public static isRunning: Boolean = true;
 
   public static main(): void {
     Game.init();
     Renderer.init();
 
-    EventAggregator.get(GenerateMapEvent).publish(App.mapInfo);
+    EventAggregator.get(GenerateTileGridEvent).publish(App.tileGridInfo);
 
     while (App.isRunning) {
-      readline.question("", (rawInput) => {
-        const [command, matches] = App.interpretRawCommand(rawInput);
-        App.executeCommand(command, matches);
-      });
+      var rawInput = readlineSync.question("");
+      const [command, matches] = App.interpretRawCommand(rawInput);
+      App.executeCommand(command, matches);
     }
   }
 
@@ -38,8 +41,8 @@ class App {
 
     switch (command) {
       case CommandType.New:
-        console.log("Generating new map...");
-        EventAggregator.get(GenerateMapEvent).publish(App.mapInfo);
+        console.log("Generating new tile grid...");
+        EventAggregator.get(GenerateTileGridEvent).publish(App.tileGridInfo);
         break;
       case CommandType.NewWithParams:
         let rawBombs: number = parseInt(
@@ -47,9 +50,9 @@ class App {
           10
         );
         let bombs: number = rawBombs < 1 ? 1 : rawBombs > 99 ? 99 : rawBombs;
-        App.mapInfo = App.mapInfo.withBombs(bombs);
-        console.log(`Generating new map with ${bombs} bombs...`);
-        EventAggregator.get(GenerateMapEvent).publish(App.mapInfo);
+        App.tileGridInfo = App.tileGridInfo.withBombs(bombs);
+        console.log(`Generating new tile grid with ${bombs} bombs...`);
+        EventAggregator.get(GenerateTileGridEvent).publish(App.tileGridInfo);
         break;
       case CommandType.FlagWithParams:
         let flagRow: number = rows.indexOf(

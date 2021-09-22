@@ -1,6 +1,6 @@
 ﻿export enum Color {
-  None = "whiteBright",
-  bgNone = "bgBlackBright",
+  none = "black",
+  bgNone = "bgWhite",
   black = "black",
   red = "red",
   green = "green",
