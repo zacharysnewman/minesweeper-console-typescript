@@ -15,6 +15,14 @@ export class Tile {
     this.isBomb = newIsBomb;
   }
 
+  equals(other: Tile): Boolean {
+    return (
+      this.coords.equals(other.coords) &&
+      this.tileState === other.tileState &&
+      this.isBomb === other.isBomb
+    );
+  }
+
   newTileWithCoords(coords: Coords): Tile {
     return new Tile(coords, TileState.hidden, false);
   }

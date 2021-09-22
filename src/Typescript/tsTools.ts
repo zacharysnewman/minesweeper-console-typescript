@@ -1,6 +1,10 @@
-import { Coords } from "./../State/Coords";
-import { Tile } from "./../State/Tile";
+import { Tile } from "../State/Tile";
 
+export const tileArrayEquals = (a: Tile[], b: Tile[]): Boolean =>
+  Array.isArray(a) &&
+  Array.isArray(b) &&
+  a.length === b.length &&
+  a.every((aTile, atTileIndex) => aTile.equals(b[atTileIndex]));
 // export const tileArrayToTileMap = (tileArray: Tile[]): Tile[] => {
 //   // let x = JSON.stringify(Object.entries(tileArray));
 //   // console.log("TileArray: ", JSON.stringify(x));

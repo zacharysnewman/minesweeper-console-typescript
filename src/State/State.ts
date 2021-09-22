@@ -15,9 +15,7 @@ export class State {
   }
 
   public withTileGrid(newTileGrid: TileGrid): State {
-    return /*this.tileGrid.equals(newTileGrid) ? this :*/ new State(
-      newTileGrid
-    );
+    return this.tileGrid.equals(newTileGrid) ? this : new State(newTileGrid);
   }
   public withActivatedTile(coords: Coords, flagMode: Boolean): State {
     return this.tileGrid.canActivateTile(coords)

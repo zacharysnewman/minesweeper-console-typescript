@@ -3,6 +3,7 @@ import { Shuffler } from "../TileGridGeneration/Shuffler";
 import { Coords } from "./Coords";
 import { Tile } from "./Tile";
 import { TileState } from "./TileState";
+import { tileArrayEquals } from "../Typescript/tsTools";
 
 export class TileGrid {
   public readonly tileGridInfo: TileGridInformation;
@@ -14,12 +15,12 @@ export class TileGrid {
     this.tileArray = tiles === undefined ? [] : tiles;
   }
 
-  // public equals(other: TileGrid): Boolean {
-  //   return (
-  //     this.tileGridInfo.equals(other.tileGridInfo) &&
-  //     this.tiles.equals(other.tiles)
-  //   );
-  // }
+  public equals(other: TileGrid): Boolean {
+    return (
+      this.tileGridInfo.equals(other.tileGridInfo) &&
+      tileArrayEquals(this.tileArray, other.tileArray)
+    );
+  }
 
   public static generateNewTileGrid(
     tileGridInfo: TileGridInformation,
@@ -30,7 +31,7 @@ export class TileGrid {
     for (let x = 0; x < tileGridInfo.Width; x++) {
       for (let y = 0; y < tileGridInfo.Height; y++) {
         var newTileCoords = new Coords(x, y);
-        if (doExcludeTile && excludedTileCoords == newTileCoords) {
+        if (doExcludeTile && excludedTileCoords.equals(newTileCoords)) {
           continue;
         }
         allTiles.push(new Tile(newTileCoords));

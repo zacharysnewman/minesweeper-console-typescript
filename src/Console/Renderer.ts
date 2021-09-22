@@ -52,7 +52,7 @@ export abstract class Renderer {
   private static readonly Logo: ConsoleString = new ConsoleString(
     CoolRendering.MinesweeperLogoSmall,
     Color.yellowBright,
-    Color.bgNone
+    Color.bgBlack
   );
 
   private static readonly CommandList: string =
@@ -71,7 +71,8 @@ export abstract class Renderer {
     // const tileArray = tileMapToTileArray(tiles);
     const winLoseStatus = Renderer.WinOrLoseCheck(tileArray);
 
-    //console.clear();
+    console.clear();
+    console.log("\n\n\n\n\n\n\n\n\n\n\n");
     // console.log("Tiles: ", tiles);
 
     let output: string = "";
