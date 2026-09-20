@@ -1,30 +1,34 @@
 {
   "name": "minesweeper-typescript",
   "version": "1.0.0",
-  "description": "",
+  "description": "Minesweeper in TypeScript, playable in the console or the browser.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node src/app.ts"
+    "start": "ts-node src/app.ts",
+    "dev": "vite",
+    "build": "tsc -p tsconfig.web.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zacharysnewman/minesweeper-typescript.git"
+    "url": "git+https://github.com/zacharysnewman/minesweeper-console-typescript.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/zacharysnewman/minesweeper-typescript/issues"
+    "url": "https://github.com/zacharysnewman/minesweeper-console-typescript/issues"
   },
-  "homepage": "https://github.com/zacharysnewman/minesweeper-typescript#readme",
+  "homepage": "https://zacharysnewman.github.io/minesweeper-console-typescript/",
   "dependencies": {
     "chalk": "^4.1.2",
     "readline-sync": "^1.4.10"
   },
   "devDependencies": {
-    "@types/node": "^16.9.4",
+    "@types/node": "^22.7.5",
     "@types/readline-sync": "^1.4.4",
     "ts-node": "^10.2.1",
-    "typescript": "^4.4.3"
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
   }
 }
