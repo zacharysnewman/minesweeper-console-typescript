@@ -65,8 +65,14 @@ typings/
 .next
 
 # images
+# NOTE: game art under public/assets is intentionally tracked.
 *.png
 *.jpg
+!public/assets/*.png
 
 # CSharp files
 *.cs
+
+# build output
+dist
+.tsbuild

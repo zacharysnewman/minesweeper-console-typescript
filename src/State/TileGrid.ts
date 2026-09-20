@@ -110,17 +110,11 @@ export class TileGrid {
         }
         break;
       case TileState.flagged:
-        newTiles[tileIndex] = tile.with(
-          undefined,
-          flagMode ? TileState.flagged : TileState.revealed
-        );
-
-        // newTiles.set(
-        //   coords,
-        //   flagMode
-        //     ? tile.with(undefined, TileState.hidden)
-        //     : (newTiles.find((x) => x.coords.equals(coords)) as Tile)
-        // );
+        // Flagging a flagged tile clears the flag; revealing one does nothing,
+        // so a mis-flag can be taken back without detonating the tile under it.
+        if (flagMode) {
+          newTiles[tileIndex] = tile.with(undefined, TileState.hidden);
+        }
         break;
       case TileState.revealed:
         if (

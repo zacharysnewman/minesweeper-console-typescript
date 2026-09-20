@@ -4,7 +4,8 @@ import { State } from "./../State/State";
 import { Color } from "./Color";
 import { ConsoleString } from "./ConsoleString";
 import { CoolRendering } from "./CoolRendering";
-import { WinLoseStatus } from "./WinLoseStatus";
+import { WinLoseStatus } from "./../State/WinLoseStatus";
+import { winLoseCheck } from "./../State/winLoseCheck";
 import { TileState } from "./../State/TileState";
 import { Tile } from "./../State/Tile";
 import { Coords } from "./../State/Coords";
@@ -69,7 +70,7 @@ export abstract class Renderer {
   public static onStateChanged(newState: State): void {
     const { tileGridInfo, tileArray } = newState.tileGrid;
     // const tileArray = tileMapToTileArray(tiles);
-    const winLoseStatus = Renderer.WinOrLoseCheck(tileArray);
+    const winLoseStatus = winLoseCheck(tileArray);
 
     console.clear();
     console.log("\n\n\n\n\n\n\n\n\n\n\n");
@@ -89,11 +90,16 @@ export abstract class Renderer {
     // console.log(
     let gameBoard = "";
 
-    gameBoard += "\n                                               \n     ";
-    for (let i = 0; i < 10; i++) {
-      // console.log(
-      gameBoard += i + "   ";
-    }
+    const columnHeader = () => {
+      let header = "     ";
+      for (let i = 0; i < tileGridInfo.Height; i++) {
+        header += (i % 10) + "   ";
+      }
+      return header;
+    };
+    const rowRule = "   " + "|---".repeat(tileGridInfo.Height) + "|   \n";
+
+    gameBoard += "\n\n" + columnHeader();
     // console.log(
     gameBoard += "  \n";
 
@@ -111,7 +117,7 @@ export abstract class Renderer {
 
     for (let x = 0; x < tileGridInfo.Width; x++) {
       // console.log(
-      gameBoard += "   |---|---|---|---|---|---|---|---|---|---|   \n";
+      gameBoard += rowRule;
       // console.log(
       gameBoard += " " + "abcdefghijklmnopqrstuvwxyz".toUpperCase()[x] + " | ";
       for (let y = 0; y < tileGridInfo.Height; y++) {
@@ -134,11 +140,7 @@ export abstract class Renderer {
       gameBoard += " \n";
     }
     // console.log(
-    gameBoard += "   |---|---|---|---|---|---|---|---|---|---|   \n     ";
-    for (let i = 0; i < 10; i++) {
-      // console.log(
-      gameBoard += i + "   ";
-    }
+    gameBoard += rowRule + columnHeader();
     // console.log(
     gameBoard += "  \n                                               \n\n";
 
@@ -149,7 +151,7 @@ export abstract class Renderer {
     output += Renderer.CommandList;
     // console.log(
     output += "\n\n";
-    var winOrLoseStatus = Renderer.WinOrLoseCheck(tileArray);
+    var winOrLoseStatus = winLoseStatus;
     var gameStatus =
       winOrLoseStatus === WinLoseStatus.win
         ? "You Won!"
@@ -165,22 +167,6 @@ export abstract class Renderer {
     console.log(output);
   }
 
-  private static WinOrLoseCheck(tiles: Tile[]): WinLoseStatus {
-    var isBombRevealed = tiles.some(
-      (x) => x.isBomb && x.tileState === TileState.revealed
-    );
-    if (isBombRevealed) {
-      return WinLoseStatus.lose;
-    }
-    var allTilesAreRevealed = tiles.every(
-      (x) => x.isBomb || (!x.isBomb && x.tileState === TileState.revealed)
-    );
-    if (allTilesAreRevealed) {
-      return WinLoseStatus.win;
-    }
-
-    return WinLoseStatus.none;
-  }
 
   private static GetTileString(
     tilesArray: Tile[],

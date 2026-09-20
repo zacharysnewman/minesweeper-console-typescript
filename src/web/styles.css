@@ -1,0 +1,244 @@
+@font-face {
+  font-family: "Digital Numbers";
+  src: url("/assets/digital-numbers.ttf") format("truetype");
+  font-display: swap;
+}
+
+:root {
+  --tile: 28px;
+  --smiley: 34px;
+  --face: #c0c0c0;
+  --shadow: #808080;
+  --highlight: #ffffff;
+  --ink: #1a1a1a;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 16px;
+  background: #3a3a3a;
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
+}
+
+h1 {
+  margin: 0;
+  color: #f0f0f0;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.frame {
+  background: var(--face);
+  width: max-content;
+  max-width: 100%;
+  border-top: 3px solid var(--highlight);
+  border-left: 3px solid var(--highlight);
+  border-right: 3px solid var(--shadow);
+  border-bottom: 3px solid var(--shadow);
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 6px;
+  border-top: 2px solid var(--shadow);
+  border-left: 2px solid var(--shadow);
+  border-right: 2px solid var(--highlight);
+  border-bottom: 2px solid var(--highlight);
+}
+
+#counter {
+  font-family: "Digital Numbers", ui-monospace, monospace;
+  font-size: 26px;
+  line-height: 1;
+  padding: 3px 6px;
+  min-width: 3.5ch;
+  text-align: right;
+  color: #ff2b2b;
+  background: #200000;
+  letter-spacing: 0.06em;
+}
+
+#smiley {
+  width: var(--smiley);
+  height: var(--smiley);
+  padding: 0;
+  cursor: pointer;
+  border: 0;
+  background-color: transparent;
+  background-image: url("/assets/smileys.png");
+  background-repeat: no-repeat;
+  background-size: calc(var(--smiley) / 25 * 139) calc(var(--smiley) / 25 * 84);
+  image-rendering: pixelated;
+}
+
+.hud-spacer {
+  /* Mirrors the counter so the smiley stays centred without a timer. */
+  width: 3.5ch;
+  min-width: 52px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #f0f0f0;
+  font-size: 0.85rem;
+}
+
+#flag-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  min-height: 34px;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--face);
+  border-top: 2px solid var(--highlight);
+  border-left: 2px solid var(--highlight);
+  border-right: 2px solid var(--shadow);
+  border-bottom: 2px solid var(--shadow);
+}
+
+/* Pressed-in, the way the rest of the chrome reads depth. */
+#flag-mode[aria-pressed="true"] {
+  border-top-color: var(--shadow);
+  border-left-color: var(--shadow);
+  border-right-color: var(--highlight);
+  border-bottom-color: var(--highlight);
+  background: #b0b0b0;
+}
+
+.flag-icon {
+  width: 16px;
+  height: 16px;
+  background-image: url("/assets/tileset.png");
+  background-repeat: no-repeat;
+  /* Row 10 of the strip is the flagged tile. */
+  background-size: 16px calc(16px * 14);
+  background-position: 0 -160px;
+  image-rendering: pixelated;
+}
+
+#difficulty {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  background: var(--face);
+  border-top: 2px solid var(--highlight);
+  border-left: 2px solid var(--highlight);
+  border-right: 2px solid var(--shadow);
+  border-bottom: 2px solid var(--shadow);
+}
+
+#board {
+  display: grid;
+  width: max-content;
+  margin-inline: auto;
+  grid-template-columns: repeat(var(--columns, 9), var(--tile));
+  border-top: 3px solid var(--shadow);
+  border-left: 3px solid var(--shadow);
+  border-right: 3px solid var(--highlight);
+  border-bottom: 3px solid var(--highlight);
+  touch-action: manipulation;
+}
+
+#board.is-over .tile {
+  cursor: default;
+}
+
+.tile {
+  width: var(--tile);
+  height: var(--tile);
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  background-color: transparent;
+  background-image: url("/assets/tileset.png");
+  background-repeat: no-repeat;
+  /* The strip is 16x224; scaling both axes keeps each 16px slice aligned. */
+  background-size: var(--tile) calc(var(--tile) * 14);
+  image-rendering: pixelated;
+  /* A long press must not raise the platform's selection callout or menu. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tile:focus-visible {
+  outline: 2px solid #1e88ff;
+  outline-offset: -2px;
+}
+
+#status {
+  min-height: 1.4em;
+  color: #f0f0f0;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+footer {
+  color: #9a9a9a;
+  font-size: 0.75rem;
+  text-align: center;
+  max-width: 46ch;
+  line-height: 1.5;
+}
+
+footer a {
+  color: #c8c8c8;
+}
+
+.hint {
+  color: #9a9a9a;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --tile: 26px;
+  }
+}
+
+/* Touch devices get a larger target and a roomier hit area than a cursor needs. */
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    --tile: 30px;
+    --smiley: 40px;
+  }
+
+  #flag-mode,
+  #difficulty {
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+
+  body {
+    justify-content: flex-start;
+  }
+}

@@ -1,0 +1,55 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minesweeper</title>
+    <meta
+      name="description"
+      content="A browser build of a TypeScript Minesweeper, sharing its game logic with the original console version."
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  </head>
+  <body>
+    <h1>Minesweeper</h1>
+
+    <div class="frame">
+      <div class="hud">
+        <div id="counter" aria-live="polite" aria-label="Mines remaining">000</div>
+        <button id="smiley" type="button" aria-label="New game"></button>
+        <div class="hud-spacer" aria-hidden="true"></div>
+      </div>
+      <div id="board" role="grid" aria-label="Minefield"></div>
+    </div>
+
+    <div class="controls">
+      <button id="flag-mode" type="button" aria-pressed="false">
+        <span class="flag-icon" aria-hidden="true"></span>
+        Flag mode
+      </button>
+      <label for="difficulty">Difficulty</label>
+      <select id="difficulty">
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="expert">Expert</option>
+      </select>
+    </div>
+
+    <p id="status" role="status"></p>
+    <p class="hint" id="hint"></p>
+
+    <footer>
+      Game logic shared with the
+      <a href="https://github.com/zacharysnewman/minesweeper-console-typescript"
+        >console version</a
+      >. Tile and smiley art and the digital counter font come from the
+      <a href="https://github.com/zacharysnewman/minesweeper-unity-csharp"
+        >Unity build</a
+      >; see the repository README for attribution.
+    </footer>
+
+    <script type="module" src="/src/web/main.ts"></script>
+  </body>
+</html>

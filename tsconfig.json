@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "lib": ["ES2020", "DOM"],
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
     "target": "ES2020",
     "rootDir": ".",
     "outDir": ".tsbuild",
@@ -12,7 +15,17 @@
     "baseUrl": ".",
     "sourceMap": false,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/web",
+    "dist",
+    ".tsbuild"
+  ],
+  "include": [
+    "src"
+  ]
 }
