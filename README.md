@@ -17,6 +17,24 @@ npm run preview # serve the built dist/ locally
 npm run typecheck
 ```
 
+## Controls
+
+The web build resolves mouse and touch to the same pair of actions, so the
+flag-mode toggle works with either:
+
+|             | primary (tap / left click) | secondary (hold / right click) |
+| ----------- | -------------------------- | ------------------------------ |
+| normal mode | reveal                     | flag or unflag                 |
+| flag mode   | flag or unflag             | reveal                         |
+
+One override sits on top of that table: a press on an already-revealed tile
+always activates it, so tapping a number clears around it in either mode.
+A hold is 450 ms, and dragging more than 12 px cancels it, so scrolling the
+board never drops a flag.
+
+The terminal build is unchanged: `check a3` / `a3` reveals, `flag a3` / `f a3`
+flags, `new` and `new <bombs>` restart.
+
 ## Layout
 
 ```

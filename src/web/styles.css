@@ -99,9 +99,48 @@ h1 {
 .controls {
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 8px;
   color: #f0f0f0;
   font-size: 0.85rem;
+}
+
+#flag-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  min-height: 34px;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--face);
+  border-top: 2px solid var(--highlight);
+  border-left: 2px solid var(--highlight);
+  border-right: 2px solid var(--shadow);
+  border-bottom: 2px solid var(--shadow);
+}
+
+/* Pressed-in, the way the rest of the chrome reads depth. */
+#flag-mode[aria-pressed="true"] {
+  border-top-color: var(--shadow);
+  border-left-color: var(--shadow);
+  border-right-color: var(--highlight);
+  border-bottom-color: var(--highlight);
+  background: #b0b0b0;
+}
+
+.flag-icon {
+  width: 16px;
+  height: 16px;
+  background-image: url("/assets/tileset.png");
+  background-repeat: no-repeat;
+  /* Row 10 of the strip is the flagged tile. */
+  background-size: 16px calc(16px * 14);
+  background-position: 0 -160px;
+  image-rendering: pixelated;
 }
 
 #difficulty {
@@ -143,6 +182,11 @@ h1 {
   /* The strip is 16x224; scaling both axes keeps each 16px slice aligned. */
   background-size: var(--tile) calc(var(--tile) * 14);
   image-rendering: pixelated;
+  /* A long press must not raise the platform's selection callout or menu. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .tile:focus-visible {
@@ -177,6 +221,24 @@ footer a {
 
 @media (max-width: 640px) {
   :root {
-    --tile: 22px;
+    --tile: 26px;
+  }
+}
+
+/* Touch devices get a larger target and a roomier hit area than a cursor needs. */
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    --tile: 30px;
+    --smiley: 40px;
+  }
+
+  #flag-mode,
+  #difficulty {
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+
+  body {
+    justify-content: flex-start;
   }
 }

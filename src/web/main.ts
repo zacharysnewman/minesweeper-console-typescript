@@ -46,6 +46,30 @@ renderer.init();
 
 requireElement("smiley").addEventListener("click", () => newGame());
 
+const flagModeButton = requireElement<HTMLButtonElement>("flag-mode");
+const hint = requireElement("hint");
+
+const isTouch = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+function updateHint(): void {
+  const flagging = renderer.isFlagMode();
+  const primary = flagging ? "flags" : "reveals";
+  const secondary = flagging ? "reveals" : "flags";
+  hint.textContent = isTouch
+    ? `Tap ${primary} · hold ${secondary} · tap a number to clear around it`
+    : `Left click ${primary} · right click ${secondary}`;
+}
+
+flagModeButton.addEventListener("click", () => {
+  const next = !renderer.isFlagMode();
+  renderer.setFlagMode(next);
+  flagModeButton.setAttribute("aria-pressed", String(next));
+  updateHint();
+});
+
+renderer.setFlagMode(false);
+updateHint();
+
 const difficultySelect = requireElement<HTMLSelectElement>("difficulty");
 difficultySelect.addEventListener("change", () => {
   const value = difficultySelect.value;

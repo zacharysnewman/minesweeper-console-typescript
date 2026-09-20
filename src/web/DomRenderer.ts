@@ -24,7 +24,23 @@ export interface DomRendererElements {
   status: HTMLElement;
 }
 
+interface PointerGesture {
+  id: number;
+  coords: Coords;
+  startX: number;
+  startY: number;
+  pointerType: string;
+  timer: number | null;
+  /** Set once the long press has fired, so the release does not act again. */
+  resolved: boolean;
+}
+
 export class DomRenderer {
+  // Long enough not to fire on a hurried tap, short enough to feel deliberate.
+  private static readonly LONG_PRESS_MS = 450;
+  // A drag of more than roughly half a tile is a scroll, not a press.
+  private static readonly MOVE_TOLERANCE_PX = 12;
+
   private readonly elements: DomRendererElements;
   private readonly onActivate: ActivateHandler;
 
@@ -35,6 +51,12 @@ export class DomRenderer {
   private renderedHeight = -1;
   private gameOver = false;
   private smileyHeldDown = false;
+
+  /** Inverts tap and hold, for flagging without a right mouse button. */
+  private flagMode = false;
+  /** The tiles behind the current render, so a press can read tile state. */
+  private lastTiles = new Map<string, Tile>();
+  private gesture: PointerGesture | null = null;
 
   constructor(elements: DomRendererElements, onActivate: ActivateHandler) {
     this.elements = elements;
@@ -47,59 +69,157 @@ export class DomRenderer {
     this.setSmiley("active");
   }
 
+  public setFlagMode(on: boolean): void {
+    this.flagMode = on;
+    this.elements.board.classList.toggle("flag-mode", on);
+  }
+
+  public isFlagMode(): boolean {
+    return this.flagMode;
+  }
+
+  // --- input -------------------------------------------------------------
+  //
+  // Mouse and touch resolve to the same pair of actions:
+  //
+  //                    primary (tap / left)   secondary (hold / right)
+  //   normal mode      reveal                 flag or unflag
+  //   flag mode        flag or unflag         reveal
+  //
+  // with one override: a press on an already-revealed tile always activates
+  // it, so tapping a number chords it in either mode.
+
   private bindBoardEvents(): void {
     const { board, smiley } = this.elements;
 
+    // The platform's own long-press menu would pre-empt the flag gesture.
     board.addEventListener("contextmenu", (event) => event.preventDefault());
 
-    board.addEventListener("mousedown", (event) => {
-      if (this.gameOver) return;
-      // The face reacts to the press itself, matching the Unity tileset's
-      // separate "tile clicked" expression.
-      this.setSmiley("tileClicked");
-    });
+    board.addEventListener("pointerdown", this.onPointerDown);
+    board.addEventListener("pointermove", this.onPointerMove);
+    board.addEventListener("pointerup", this.onPointerUp);
+    board.addEventListener("pointercancel", this.cancelGesture);
+    board.addEventListener("pointerleave", this.cancelGesture);
 
-    const releaseFace = () => {
-      if (!this.gameOver && !this.smileyHeldDown) {
-        this.setSmiley("active");
-      }
-    };
-    document.addEventListener("mouseup", releaseFace);
-    board.addEventListener("mouseleave", releaseFace);
-
-    board.addEventListener("click", (event) => {
-      const coords = this.coordsFromEvent(event);
-      if (coords) this.onActivate(coords, false);
-    });
-
-    board.addEventListener("auxclick", (event) => {
-      if (event.button !== 1) return;
-      const coords = this.coordsFromEvent(event);
-      if (coords) this.onActivate(coords, false);
-    });
-
-    board.addEventListener("contextmenu", (event) => {
-      const coords = this.coordsFromEvent(event);
-      if (coords) this.onActivate(coords, true);
-    });
-
-    smiley.addEventListener("mousedown", () => {
+    smiley.addEventListener("pointerdown", () => {
       this.smileyHeldDown = true;
       this.setSmiley("activeClicked");
     });
-    document.addEventListener("mouseup", () => {
+    document.addEventListener("pointerup", () => {
       this.smileyHeldDown = false;
     });
   }
 
-  private coordsFromEvent(event: Event): Coords | null {
-    if (this.gameOver) return null;
-    const target = (event.target as HTMLElement)?.closest<HTMLElement>(
+  private onPointerDown = (event: PointerEvent): void => {
+    if (this.gameOver) return;
+
+    const cell = (event.target as HTMLElement | null)?.closest<HTMLElement>(
       "[data-x]"
     );
-    if (!target) return null;
-    return new Coords(Number(target.dataset.x), Number(target.dataset.y));
+    if (!cell) return;
+
+    // Ignore anything that is not the left or right mouse button.
+    if (event.pointerType === "mouse" && event.button !== 0 && event.button !== 2) {
+      return;
+    }
+
+    this.cancelGesture();
+
+    const coords = new Coords(Number(cell.dataset.x), Number(cell.dataset.y));
+    const gesture: PointerGesture = {
+      id: event.pointerId,
+      coords,
+      startX: event.clientX,
+      startY: event.clientY,
+      pointerType: event.pointerType,
+      timer: null,
+      resolved: false,
+    };
+    this.gesture = gesture;
+    this.setSmiley("tileClicked");
+
+    // A mouse has a second button, so only touch and pen need the hold.
+    if (event.pointerType !== "mouse") {
+      gesture.timer = window.setTimeout(() => {
+        if (this.gesture !== gesture) return;
+        gesture.resolved = true;
+        this.buzz();
+        this.releaseFace();
+        this.dispatch(gesture.coords, true);
+      }, DomRenderer.LONG_PRESS_MS);
+    }
+  };
+
+  private onPointerMove = (event: PointerEvent): void => {
+    const gesture = this.gesture;
+    if (!gesture || gesture.id !== event.pointerId || gesture.resolved) return;
+
+    const drifted =
+      Math.abs(event.clientX - gesture.startX) >
+        DomRenderer.MOVE_TOLERANCE_PX ||
+      Math.abs(event.clientY - gesture.startY) > DomRenderer.MOVE_TOLERANCE_PX;
+    if (drifted) {
+      this.cancelGesture();
+    }
+  };
+
+  private onPointerUp = (event: PointerEvent): void => {
+    const gesture = this.gesture;
+    if (!gesture || gesture.id !== event.pointerId) return;
+
+    this.clearGestureTimer(gesture);
+    this.gesture = null;
+    this.releaseFace();
+
+    // The long press already acted; the release that ends it must not repeat.
+    if (gesture.resolved) return;
+
+    const secondary = gesture.pointerType === "mouse" && event.button === 2;
+    this.dispatch(gesture.coords, secondary);
+  };
+
+  private cancelGesture = (): void => {
+    if (!this.gesture) return;
+    this.clearGestureTimer(this.gesture);
+    this.gesture = null;
+    this.releaseFace();
+  };
+
+  private clearGestureTimer(gesture: PointerGesture): void {
+    if (gesture.timer !== null) {
+      window.clearTimeout(gesture.timer);
+      gesture.timer = null;
+    }
   }
+
+  private dispatch(coords: Coords, secondary: boolean): void {
+    if (this.gameOver) return;
+
+    const tile = this.lastTiles.get(`${coords.x},${coords.y}`);
+    if (tile && tile.tileState === TileState.revealed) {
+      this.onActivate(coords, false);
+      return;
+    }
+
+    this.onActivate(coords, secondary ? !this.flagMode : this.flagMode);
+  }
+
+  private buzz(): void {
+    // Confirms the hold registered on phones that support it.
+    try {
+      navigator.vibrate?.(12);
+    } catch {
+      /* vibration is a nicety; never let it break the move */
+    }
+  }
+
+  private releaseFace(): void {
+    if (!this.gameOver && !this.smileyHeldDown) {
+      this.setSmiley("active");
+    }
+  }
+
+  // --- rendering ---------------------------------------------------------
 
   // Arrow function so it keeps its binding when handed to the event aggregator.
   private onStateChanged = (newState: State): void => {
@@ -108,18 +228,21 @@ export class DomRenderer {
 
     const status = winLoseCheck(tileArray);
     this.gameOver = status !== WinLoseStatus.none;
+    if (this.gameOver) {
+      this.cancelGesture();
+    }
 
     this.ensureGrid(tileGridInfo.Width, tileGridInfo.Height);
 
     // Index by coordinate once instead of scanning the array per cell.
-    const byCoords = new Map<string, Tile>();
+    this.lastTiles = new Map<string, Tile>();
     for (const tile of tileArray) {
-      byCoords.set(`${tile.coords.x},${tile.coords.y}`, tile);
+      this.lastTiles.set(`${tile.coords.x},${tile.coords.y}`, tile);
     }
 
     for (let x = 0; x < tileGridInfo.Width; x++) {
       for (let y = 0; y < tileGridInfo.Height; y++) {
-        const tile = byCoords.get(`${x},${y}`);
+        const tile = this.lastTiles.get(`${x},${y}`);
         if (!tile) continue;
         const cell = this.cells[x * tileGridInfo.Height + y];
         const index = tileIndexFor(tileArray, tile, status);
@@ -196,6 +319,7 @@ export class DomRenderer {
   }
 
   public reset(): void {
+    this.cancelGesture();
     this.gameOver = false;
     this.setSmiley("active");
   }

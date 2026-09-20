@@ -25,6 +25,10 @@
     </div>
 
     <div class="controls">
+      <button id="flag-mode" type="button" aria-pressed="false">
+        <span class="flag-icon" aria-hidden="true"></span>
+        Flag mode
+      </button>
       <label for="difficulty">Difficulty</label>
       <select id="difficulty">
         <option value="beginner">Beginner</option>
@@ -34,7 +38,7 @@
     </div>
 
     <p id="status" role="status"></p>
-    <p class="hint">Left click reveals &middot; right click flags</p>
+    <p class="hint" id="hint"></p>
 
     <footer>
       Game logic shared with the
