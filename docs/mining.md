@@ -51,11 +51,21 @@ holds its own copy of the last `TileGrid` it saw rather than reaching into
 | `Console/MiningRenderer.ts` | one front end. The only place the two layers are drawn together |
 | `checks.ts` | `npm run mine:check` — the rules checking themselves |
 
-`movement.ts` never applies anything. It returns the next `PlayerState` and, if
-the game needs to be asked for something, an `ActivateRequest` describing what.
-`Player` is what publishes it. That split is what makes the rules testable
-without an event bus, and what keeps "the player wants to dig" distinct from
-"the board changed".
+`PlayerState` is built exactly the way the game's state is built — readonly
+fields, an all-optional constructor, a positional `with`, a structural
+`equals`, and semantic transitions (`withStepTo`, `withDig`) that hand back
+`this` when nothing changed, the same shape as `State.withTileGrid`. It is a
+peer of `State`, not a part of it. CLAUDE.md has the patterns in full,
+including the one place this layer deliberately parts company with the game's
+state: `State` publishes from its constructor and `PlayerState` does not,
+because movement builds intermediate values while it works out what an input
+means.
+
+`movement.ts` never applies anything. It picks the transition and returns the
+next `PlayerState` plus, if the game needs to be asked for something, an
+`ActivateRequest` describing what. `Player` is what publishes it. That split is
+what makes the rules testable without an event bus, and what keeps "the player
+wants to dig" distinct from "the board changed".
 
 ## The rules, as they stand
 

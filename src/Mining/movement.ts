@@ -1,6 +1,5 @@
 import { Coords } from "../State/Coords";
 import { TileGrid } from "../State/TileGrid";
-import { ActionResult } from "./ActionResult";
 import { Direction, step } from "./Direction";
 import { PlayerState } from "./PlayerState";
 import { Terrain, terrainAt } from "./Terrain";
@@ -27,24 +26,18 @@ export function resolveMove(
   tileGrid: TileGrid,
   direction: Direction
 ): PlayerAction {
-  const facing = player.with({ facing: direction });
   const target = step(player.coords, direction);
 
   switch (terrainAt(tileGrid, target)) {
     case Terrain.open:
-      return {
-        player: facing.with({ coords: target, lastResult: ActionResult.moved }),
-      };
+      return { player: player.withStepTo(target, direction) };
     case Terrain.rock:
       return {
-        player: facing.with({
-          digCount: facing.digCount + 1,
-          lastResult: ActionResult.dug,
-        }),
+        player: player.withDig(direction),
         activate: { coords: target, flagMode: false },
       };
     default:
-      return { player: facing.with({ lastResult: ActionResult.blocked }) };
+      return { player: player.withBlocked(direction) };
   }
 }
 
@@ -55,15 +48,14 @@ export function resolveMark(
   tileGrid: TileGrid,
   direction: Direction
 ): PlayerAction {
-  const facing = player.with({ facing: direction });
   const target = step(player.coords, direction);
   const terrain = terrainAt(tileGrid, target);
 
   if (terrain === Terrain.rock || terrain === Terrain.marked) {
     return {
-      player: facing.with({ lastResult: ActionResult.marked }),
+      player: player.withMark(direction),
       activate: { coords: target, flagMode: true },
     };
   }
-  return { player: facing.with({ lastResult: ActionResult.blocked }) };
+  return { player: player.withBlocked(direction) };
 }

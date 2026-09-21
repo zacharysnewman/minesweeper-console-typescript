@@ -62,6 +62,25 @@ function grid(...rows: string[]): TileGrid {
 
 const at = (x: number, y: number) => new PlayerState(new Coords(x, y), Direction.north, 0, true);
 
+console.log("\nthe state value");
+{
+  const a = new PlayerState(new Coords(1, 2), Direction.east, 3, true, ActionResult.moved);
+  const b = new PlayerState(new Coords(1, 2), Direction.east, 3, true, ActionResult.moved);
+  check("equals is structural, not by reference", a.equals(b) === true && a !== b);
+  check("a default player is not on the board", new PlayerState().isSpawned === false);
+  check("spawnedAt puts a fresh player on the board", PlayerState.spawnedAt(new Coords(4, 5)).isSpawned === true);
+  check("spawnedAt starts the dig count over", PlayerState.spawnedAt(new Coords(4, 5)).digCount === 0);
+
+  const copied = a.with(undefined, Direction.west);
+  check("with copies, leaving the original alone", a.facing === Direction.east && copied.facing === Direction.west);
+  check("with carries every field it was not given", copied.coords.equals(a.coords) === true && copied.digCount === 3);
+
+  const blocked = a.withBlocked(Direction.north);
+  check("a transition that changes something returns a new value", blocked !== a);
+  check("a transition that changes nothing returns the same value", blocked.withBlocked(Direction.north) === blocked);
+  check("digging counts up from wherever it was", a.withDig(Direction.north).digCount === 4);
+}
+
 console.log("\nterrain");
 {
   const g = grid("#.!", "*,.");

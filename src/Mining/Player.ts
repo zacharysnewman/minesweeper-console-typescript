@@ -4,7 +4,6 @@ import { State } from "../State/State";
 import { TileGrid } from "../State/TileGrid";
 import { winLoseCheck } from "../State/winLoseCheck";
 import { WinLoseStatus } from "../State/WinLoseStatus";
-import { ActionResult } from "./ActionResult";
 import { Direction } from "./Direction";
 import {
   MarkTileEvent,
@@ -46,13 +45,7 @@ export abstract class Player {
       return;
     }
 
-    Player.state = new PlayerState(
-      coords,
-      Direction.north,
-      0,
-      true,
-      ActionResult.none
-    );
+    Player.state = PlayerState.spawnedAt(coords);
 
     // Hollow out the pocket the player wakes up in. On a fresh board this is
     // the first activation, so the bombs are regenerated around the spawn and

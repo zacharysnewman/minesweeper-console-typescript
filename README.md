@@ -64,6 +64,7 @@ src/Mining/             player state and movement, layered over the game
 src/app.ts              terminal entry point
 src/mining.ts           terminal entry point for the mining experience
 public/assets/          sprite sheets, counter font, icons
+CLAUDE.md               the state and rendering patterns this project follows
 ```
 
 Both renderers subscribe to `StateChangedEvent` and publish
