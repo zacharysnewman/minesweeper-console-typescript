@@ -112,9 +112,18 @@ Input is line based, like `app.ts`, so a line of movement keys (`wwdd`) runs as
 a sequence. Moving to raw keypresses means changing `src/mining.ts` and nothing
 else.
 
-Nothing outside `Console/` is console-specific, so a browser front end is a
-subscriber and a keydown handler. `src/Mining/` is not in `tsconfig.web.json`
-yet; adding it is how that would start.
+Nothing outside `Console/` is console-specific, which is what let the browser
+front end be exactly that: a subscriber and a keydown handler.
+`src/web/MiningDomRenderer.ts` draws the same tileset the minesweeper board
+draws and puts the miner on top of it; `src/web/mine.ts` maps keys, an
+on-screen pad and taps on neighbouring tiles onto `MovePlayerEvent` and
+`MarkTileEvent`, then asks for one frame. It is served at `/mine/` as a second
+Vite entry. Not a line of `src/Mining/` changed to gain it.
+
+The browser board highlights the four tiles the miner can reach. That is the
+one piece of teaching the terminal build does not need, because typing `w` and
+watching nothing happen is cheaper than tapping a tile across the cave and
+wondering why it did nothing.
 
 ## Deliberately not here yet
 

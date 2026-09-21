@@ -6,20 +6,13 @@ import { Game } from "../State/Game";
 import { Coords } from "../State/Coords";
 import { TileGridInformation } from "../TileGridGeneration/TileGridInformation";
 import { DomRenderer } from "./DomRenderer";
+import { requireElement } from "./dom";
 import {
   DEFAULT_DIFFICULTY,
   DIFFICULTIES,
   DifficultyName,
   isDifficultyName,
 } from "./difficulty";
-
-function requireElement<T extends HTMLElement>(id: string): T {
-  const element = document.getElementById(id);
-  if (!element) {
-    throw new Error(`Missing required element #${id}`);
-  }
-  return element as T;
-}
 
 const renderer = new DomRenderer(
   {

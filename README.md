@@ -4,7 +4,8 @@ Minesweeper in TypeScript. The same game logic drives every front end: the
 original terminal renderer, a browser build deployed to GitHub Pages, and a
 mining game you walk around in.
 
-**Play it:** https://zacharysnewman.github.io/minesweeper-console-typescript/
+**Play it:** [Minesweeper](https://zacharysnewman.github.io/minesweeper-console-typescript/)
+· [Mineshaft](https://zacharysnewman.github.io/minesweeper-console-typescript/mine/)
 
 ## Running it
 
@@ -13,7 +14,7 @@ npm install
 
 npm start      # play in the terminal (needs a real TTY)
 npm run mine   # play the mining experience in the terminal
-npm run dev    # play in the browser, with hot reload
+npm run dev    # play in the browser, with hot reload (/ and /mine/)
 npm run build  # produce dist/ for deployment
 npm run preview # serve the built dist/ locally
 npm run typecheck
@@ -40,13 +41,21 @@ flags, `new` and `new <bombs>` restart.
 
 ## Mining
 
-`npm run mine` is a third front end rather than a different game: you stand on
-a board as a single tile and walk it. Hidden tiles are rock, revealed tiles are
-the cave you have opened, and flags are rock you have marked not to dig. Walk
-into open cave and you move; walk into rock and you dig it instead.
+Mineshaft is a different thing to do with the same board rather than a
+different game: you stand on it as a single tile and walk. Hidden tiles are
+rock, revealed tiles are the cave you have opened, and flags are rock you have
+marked not to dig. Walk into open cave and you move; walk into rock and you dig
+it instead — so unlike Minesweeper you only reach the four tiles around you,
+and getting to a tile you have reasoned about is part of the puzzle.
 
-`w a s d` move (a run like `wwdd` walks the sequence), `f d` / `mark north`
-marks the rock ahead, `new` and `new <bombs>` dig a fresh cave.
+It ships in the browser build at **`/mine/`** and in the terminal via
+`npm run mine`.
+
+|          | browser (`/mine/`)                                 | terminal (`npm run mine`)       |
+| -------- | -------------------------------------------------- | ------------------------------- |
+| move     | `WASD` / arrows, the pad, or tap a tile beside you  | `w a s d`, or a run like `wwdd` |
+| mark     | shift + direction, or Mark mode                     | `f d` / `mark north`            |
+| new cave | the New cave button                                 | `new`, `new <bombs>`            |
 
 The player lives in its own state layer that reads the board and talks back to
 it through the same `ActivateTileEvent` the other front ends publish, so the
@@ -59,13 +68,19 @@ src/State/              game logic and immutable state, no I/O
 src/Events/             the EventAggregator the renderers subscribe to
 src/TileGridGeneration/ board generation and shuffling
 src/Console/            terminal renderer (chalk)
-src/web/                browser renderer (DOM + sprites)
+src/web/                browser renderers (DOM + sprites), one per page
 src/Mining/             player state and movement, layered over the game
-src/app.ts              terminal entry point
-src/mining.ts           terminal entry point for the mining experience
+src/app.ts              terminal entry point, minesweeper
+src/mining.ts           terminal entry point, mining
+index.html              browser page: minesweeper
+mine/index.html         browser page: mining, served at /mine/
 public/assets/          sprite sheets, counter font, icons
 CLAUDE.md               the state and rendering patterns this project follows
 ```
+
+The browser build is a two-page Vite build: `index.html` and `mine/index.html`
+are both entries, so the sub path needs no server rewrite on GitHub Pages.
+They share the game logic, the tileset and most of the CSS.
 
 Both renderers subscribe to `StateChangedEvent` and publish
 `ActivateTileEvent` / `GenerateTileGridEvent` back. Neither one holds game

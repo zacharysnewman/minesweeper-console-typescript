@@ -219,6 +219,17 @@ footer a {
   text-align: center;
 }
 
+/* The link between the two things you can do with a board. */
+.elsewhere {
+  margin: 0;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.elsewhere a {
+  color: #ffd23f;
+}
+
 @media (max-width: 640px) {
   :root {
     --tile: 26px;

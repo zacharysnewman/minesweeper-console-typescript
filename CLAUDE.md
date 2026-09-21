@@ -16,6 +16,13 @@ npm run build       # typecheck + dist/
 There is no test runner. `npm run typecheck` and `npm run mine:check` are what
 passes for one — run both before committing.
 
+`tsconfig.json` covers the node side and excludes `src/web`. `tsconfig.web.json`
+declares **its own `exclude`** rather than inheriting that one — otherwise the
+inherited `src/web` exclusion silently removes the entire browser build from
+the typecheck, which is exactly what it used to do. If you add a directory that
+only one side can compile (node globals, `chalk`), exclude it there by name,
+as `src/Mining/Console` and `src/Mining/checks.ts` are.
+
 ---
 
 # State
@@ -238,22 +245,42 @@ Colour goes through `chalk`. `src/Console/` wraps it in `ConsoleString`
 (text + fg + bg); the mining renderer calls `chalk` directly for a darker
 palette. Either is fine.
 
-## The web renderer
+## The web renderers
 
-An instance class, constructed in `main.ts` with its elements and its
-activate callback. It reuses cells across renders and rebuilds the grid only
-when the board's dimensions change; it indexes tiles by `"x,y"` rather than
-scanning the array per cell. `src/web/sprites.ts` is a pure
-`state -> tileset index` function, kept separate from the DOM work.
+Instance classes, constructed in their entry point with their elements and
+their callbacks, and subscribing through **arrow-function properties** so the
+binding survives the aggregator. They reuse cells across renders and rebuild
+the grid only when the board's dimensions change; they index tiles by `"x,y"`
+rather than scanning the array per cell. `src/web/sprites.ts` is a pure
+`state -> tileset index` function, kept separate from the DOM work and shared
+by both boards — a dug tile looks the same in either game.
 
-Entry points own the chrome — difficulty select, flag-mode toggle, new-game
-button — and the renderer owns the board.
+Entry points own the chrome — the selects, the toggles, the new-game button —
+and the renderer owns the board.
+
+## Pages
+
+The browser build is a two-page Vite build, declared in
+`build.rollupOptions.input`: `index.html` (minesweeper) and `mine/index.html`
+(mining, served at `/mine/`). Rollup keeps each entry's directory, so a sub
+path needs no server rewrite on GitHub Pages, and the two pages share chunks.
+
+A new page is an HTML file, an entry in that input map, and an entry module in
+`src/web/`. Link between pages with **relative** hrefs (`mine/`, `../`) so they
+survive the configured `base`. Page-specific CSS goes in its own file scoped
+under a body class (`body.mine`), not into `styles.css`, which both pages load.
 
 ## Input
 
 Input handling belongs to the front end, not the state. The terminal builds
-parse a line and publish; the web build resolves pointer gestures to the same
-pair of actions.
+parse a line and publish; the minesweeper page resolves pointer gestures to a
+pair of actions; the mining page maps keys, an on-screen pad and taps on
+neighbouring tiles to the same two events.
+
+Every input publishes, lets the layers settle synchronously, then draws once.
+`src/web/mine.ts` funnels all of its input through one `act()` for that reason
+— if you add an input, route it through the same place rather than publishing
+and drawing beside it.
 
 When matching input against a lookup object, use
 `Object.prototype.hasOwnProperty.call(table, key)` rather than `key in table` —

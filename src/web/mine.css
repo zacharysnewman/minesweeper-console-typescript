@@ -1,0 +1,141 @@
+/* Everything here is scoped to the mining page, so the minesweeper board that
+   shares styles.css is untouched. */
+
+body.mine {
+  /* The keyboard and the pad do the moving, so a cell only has to be a tap
+     target for its four neighbours — it can be smaller than a board you play
+     entirely by tapping. */
+  --tile: 24px;
+}
+
+.mine-hud {
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+#position {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  min-width: 14ch;
+}
+
+.mine-digs {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+#new-cave {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  min-height: 30px;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--face);
+  border-top: 2px solid var(--highlight);
+  border-left: 2px solid var(--highlight);
+  border-right: 2px solid var(--shadow);
+  border-bottom: 2px solid var(--shadow);
+}
+
+#new-cave:active {
+  border-top-color: var(--shadow);
+  border-left-color: var(--shadow);
+  border-right-color: var(--highlight);
+  border-bottom-color: var(--highlight);
+}
+
+body.mine .tile {
+  position: relative;
+  cursor: default;
+}
+
+/* The four tiles an input can act on. Most of what tells a new player this is
+   not Minesweeper: you reach what you are standing next to. */
+body.mine .tile.reachable {
+  cursor: pointer;
+  outline: 2px dashed rgba(255, 210, 63, 0.75);
+  outline-offset: -2px;
+}
+
+body.mine #board.mark-mode .tile.reachable {
+  outline-color: rgba(255, 80, 80, 0.85);
+}
+
+/* The miner: a lamp in the dark, drawn over whatever tile is underneath. */
+body.mine .tile.miner::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border-radius: 50% 50% 35% 35%;
+  background: linear-gradient(#ffe066, #e09200);
+  box-shadow: 0 0 0 1px #2a1a00, 0 0 9px 3px rgba(255, 210, 63, 0.5);
+}
+
+body.mine #board.is-over .tile.reachable {
+  outline: none;
+  cursor: default;
+}
+
+body.mine #board.is-over {
+  filter: saturate(0.6) brightness(0.85);
+}
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(2, 46px);
+  gap: 6px;
+}
+
+.pad button {
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--face);
+  border-top: 3px solid var(--highlight);
+  border-left: 3px solid var(--highlight);
+  border-right: 3px solid var(--shadow);
+  border-bottom: 3px solid var(--shadow);
+}
+
+.pad button:active {
+  border-top-color: var(--shadow);
+  border-left-color: var(--shadow);
+  border-right-color: var(--highlight);
+  border-bottom-color: var(--highlight);
+}
+
+#pad-north {
+  grid-column: 2;
+  grid-row: 1;
+}
+#pad-west {
+  grid-column: 1;
+  grid-row: 2;
+}
+#pad-south {
+  grid-column: 2;
+  grid-row: 2;
+}
+#pad-east {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  body.mine {
+    --tile: 26px;
+  }
+
+  .pad {
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(2, 56px);
+  }
+
+  #new-cave {
+    min-height: 40px;
+  }
+}
