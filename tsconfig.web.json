@@ -7,5 +7,20 @@
     "types": ["vite/client"],
     "noEmit": true
   },
-  "include": ["src/web", "src/State", "src/Events", "src/TileGridGeneration", "src/Typescript", "vite.config.ts"]
+  "include": [
+    "src/web",
+    "src/State",
+    "src/Events",
+    "src/Mining",
+    "src/TileGridGeneration",
+    "src/Typescript",
+    "vite.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".tsbuild",
+    "src/Mining/Console",
+    "src/Mining/checks.ts"
+  ]
 }

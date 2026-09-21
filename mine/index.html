@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mineshaft</title>
+    <meta
+      name="description"
+      content="A mining game played on a Minesweeper board: walk the cave, dig the rock, mark what you do not trust."
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  </head>
+  <body class="mine">
+    <h1>Mineshaft</h1>
+
+    <div class="frame">
+      <div class="hud mine-hud">
+        <div id="position" aria-live="polite" aria-label="Position">&mdash;</div>
+        <div class="mine-digs">digs <span id="digs">0</span></div>
+        <button id="new-cave" type="button">New cave</button>
+      </div>
+      <div id="board" role="grid" aria-label="Cave"></div>
+    </div>
+
+    <div class="controls">
+      <button id="mark-mode" type="button" aria-pressed="false">
+        <span class="flag-icon" aria-hidden="true"></span>
+        Mark mode
+      </button>
+      <label for="cave">Cave</label>
+      <select id="cave">
+        <option value="small">Small</option>
+        <option value="medium">Medium</option>
+        <option value="large">Large</option>
+      </select>
+    </div>
+
+    <div class="pad" role="group" aria-label="Move">
+      <button id="pad-north" type="button" aria-label="North">&#9650;</button>
+      <button id="pad-west" type="button" aria-label="West">&#9664;</button>
+      <button id="pad-east" type="button" aria-label="East">&#9654;</button>
+      <button id="pad-south" type="button" aria-label="South">&#9660;</button>
+    </div>
+
+    <p id="status" role="status"></p>
+    <p class="hint" id="hint"></p>
+
+    <footer>
+      Walk into rock and you dig it; walk into open cave and you move. The
+      numbers mean what they mean in
+      <a href="../">Minesweeper</a> &mdash; same board, same rules, but you
+      only reach the four tiles around you. Art credited in the
+      <a href="https://github.com/zacharysnewman/minesweeper-console-typescript"
+        >repository README</a
+      >.
+    </footer>
+
+    <script type="module" src="/src/web/mine.ts"></script>
+  </body>
+</html>
