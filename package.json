@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.web.json && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json",
+    "mine": "ts-node src/mining.ts",
+    "mine:check": "ts-node src/Mining/checks.ts"
   },
   "repository": {
     "type": "git",
