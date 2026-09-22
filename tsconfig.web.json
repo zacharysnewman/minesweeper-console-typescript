@@ -12,6 +12,7 @@
     "src/State",
     "src/Events",
     "src/Mining",
+    "src/Shapes",
     "src/TileGridGeneration",
     "src/Typescript",
     "vite.config.ts"
@@ -21,6 +22,7 @@
     "dist",
     ".tsbuild",
     "src/Mining/Console",
-    "src/Mining/checks.ts"
+    "src/Mining/checks.ts",
+    "src/Shapes/checks.ts"
   ]
 }

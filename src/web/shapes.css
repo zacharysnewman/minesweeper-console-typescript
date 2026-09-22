@@ -1,0 +1,110 @@
+/* Scoped to this page; styles.css is loaded by every page. */
+body.shapes {
+  background: #2f2f2f;
+}
+
+body.shapes .frame {
+  padding: 10px;
+  /* Cells shrink to fit the window, but only down to a readable size; past
+     that a big board scrolls rather than turning into confetti. */
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Cells are positioned from the layout, so the board is a positioning
+   context and nothing else. Its size is set by the renderer. */
+body.shapes #board {
+  position: relative;
+  display: block;
+  border: 0;
+  margin-inline: auto;
+  touch-action: manipulation;
+}
+
+.shape-cell {
+  position: absolute;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  /* The bounding boxes overlap for hex and triangle, so the box itself must
+     not take pointer events -- only the outline inside it does. */
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shape-cell svg {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.shape-cell polygon {
+  pointer-events: auto;
+}
+
+#board.is-over .shape-cell {
+  cursor: default;
+}
+
+/* An outline would be clipped away by the cell's own shape, so the focus ring
+   is drawn on the outline itself. */
+.shape-cell:focus {
+  outline: none;
+}
+
+.shape-cell:focus-visible polygon {
+  stroke: #1e88ff;
+  stroke-width: 3;
+}
+
+body.shapes .controls {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+body.shapes .hud {
+  justify-content: space-between;
+}
+
+body.shapes .shape-note {
+  font-size: 0.78rem;
+  color: #b8b8b8;
+  max-width: 62ch;
+  text-align: center;
+  margin: 0;
+}
+
+/* The face button, as the original game had it. Sized in its own right
+   rather than inheriting the control styling, since it is a picture. */
+.face-button {
+  width: var(--smiley, 34px);
+  height: var(--smiley, 34px);
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--smiley, 34px) * 0.72);
+  line-height: 1;
+  /* Naming an emoji font, so the fallback chain cannot answer with a
+     monochrome glyph from a coverage font. */
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji",
+    "Twemoji Mozilla", sans-serif;
+  cursor: pointer;
+  background: var(--face, #c0c0c0);
+  border-top: 3px solid var(--highlight, #fff);
+  border-left: 3px solid var(--highlight, #fff);
+  border-right: 3px solid var(--shadow, #808080);
+  border-bottom: 3px solid var(--shadow, #808080);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.face-button:active {
+  border-color: var(--shadow, #808080) var(--highlight, #fff)
+    var(--highlight, #fff) var(--shadow, #808080);
+}

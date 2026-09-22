@@ -76,3 +76,4 @@ typings/
 # build output
 dist
 .tsbuild
+.specimen/

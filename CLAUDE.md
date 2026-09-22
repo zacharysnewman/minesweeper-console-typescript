@@ -1,27 +1,38 @@
 # CLAUDE.md
 
 Minesweeper in TypeScript. One set of game rules, several front ends: a
-terminal renderer, a browser build, and a mining game you walk around in.
-Nothing in `src/State/` knows any of them exist.
+terminal renderer, a browser build, a mining game you walk around in, and a
+board that can be squares, hexagons or triangles. Nothing in `src/State/`
+knows any of them exist.
 
 ```bash
-npm run typecheck   # both tsconfigs; the gate for every change
-npm run mine:check  # the mining layer's rules, checking themselves
-npm start           # terminal minesweeper (needs a real TTY)
-npm run mine        # terminal mining game
-npm run dev         # browser build, hot reload
-npm run build       # typecheck + dist/
+npm run typecheck    # both tsconfigs; the gate for every change
+npm run mine:check   # the mining layer's rules, checking themselves
+npm run shapes:check # the shape layer's rules and cell art, likewise
+npm start            # terminal minesweeper (needs a real TTY)
+npm run mine         # terminal mining game
+npm run dev          # browser build, hot reload
+npm run build        # typecheck + dist/
+npm run shots        # specimen sheet of every cell state, photographed
+npm run page:shots   # builds, then drives and photographs the real page
 ```
 
-There is no test runner. `npm run typecheck` and `npm run mine:check` are what
-passes for one — run both before committing.
+There is no test runner. `npm run typecheck`, `npm run mine:check` and
+`npm run shapes:check` are what passes for one — run all three before
+committing. Anything about how a thing *looks* goes through `npm run shots`
+or `npm run page:shots`, which photograph it and then re-measure what
+rendered.
 
 `tsconfig.json` covers the node side and excludes `src/web`. `tsconfig.web.json`
 declares **its own `exclude`** rather than inheriting that one — otherwise the
 inherited `src/web` exclusion silently removes the entire browser build from
 the typecheck, which is exactly what it used to do. If you add a directory that
 only one side can compile (node globals, `chalk`), exclude it there by name,
-as `src/Mining/Console` and `src/Mining/checks.ts` are.
+as `src/Mining/Console`, `src/Mining/checks.ts` and `src/Shapes/checks.ts`
+are. `tsconfig.web.json` lists its `include` directories **by name**, so a new
+top level directory is invisible to the web typecheck until it is added
+there — and since `npm run build` runs that typecheck first, the symptom is a
+build that passes while the new code is never checked at all.
 
 ---
 
@@ -120,6 +131,35 @@ them to their events — that is the session idiom in this codebase, not a
 The arrays inside a state are plain arrays, not frozen. Treat them as
 immutable anyway: copy before changing (`let newTiles = [...this.tileArray]`),
 which is what `TileGrid` does throughout.
+
+## A parallel board: `src/Shapes/`
+
+`src/Shapes/` is a second, self contained state layer for a board that can be
+squares, hexagons or triangles. It is a **fork** of `TileGrid`/`State`/`Game`,
+not a generalisation of them: the square game and its renderers are untouched.
+
+The parameter is not how many sides a cell has but how many cells touch it,
+because Minesweeper counts contact at a vertex as well as along an edge — a
+square has 4 sides and 8 neighbours, a triangle 3 and 12, and a hexagon is the
+one shape where the two agree at 6. All three store in the same rectangular
+rows x cols array, so enumeration and bounds are shape independent; the whole
+of the difference is `Topology.neighbours`, and the rules are written against
+that one seam so the fork could be merged back mechanically.
+
+It reuses `Coords`, `Tile`, `TileState`, `WinLoseStatus` and — the one that
+matters — `winLoseCheck`, so the two boards can never disagree about whether a
+game is over.
+
+Two departures from `TileGrid`, both because twelve neighbours changes what the
+old behaviour means: the first click clears the whole neighbourhood rather than
+just the cell under the cursor (excluding one cell almost never cascades at
+degree 12), and the flood fill is iterative over a `"x,y"` index rather than
+recursive over a linear scan.
+
+**Its event tokens must not share a name with `src/Events/Events.ts`.**
+`EventAggregator` keys subscribers by the token's `name` string, so a
+collision silently wires the two games together — no type error, no runtime
+error. `shapes:check` checks for it.
 
 ## Layering state
 
@@ -260,13 +300,15 @@ and the renderer owns the board.
 
 ## Pages
 
-The browser build is a two-page Vite build, declared in
-`build.rollupOptions.input`: `index.html` (minesweeper) and `mine/index.html`
-(mining, served at `/mine/`). Rollup keeps each entry's directory, so a sub
+The browser build is a multi-page Vite build, declared in
+`build.rollupOptions.input`: `index.html` (minesweeper), `mine/index.html`
+(mining, at `/mine/`) and `shapes/index.html` (the other tilings, at
+`/shapes/`). Rollup keeps each entry's directory, so a sub
 path needs no server rewrite on GitHub Pages, and the two pages share chunks.
 
-A new page is an HTML file, an entry in that input map, and an entry module in
-`src/web/`. Link between pages with **relative** hrefs (`mine/`, `../`) so they
+The build is actually three pages — `index.html`, `mine/index.html` and
+`shapes/index.html`. A new page is an HTML file, an entry in that input map,
+and an entry module in `src/web/`. Link between pages with **relative** hrefs (`mine/`, `../`) so they
 survive the configured `base`. Page-specific CSS goes in its own file scoped
 under a body class (`body.mine`), not into `styles.css`, which both pages load.
 
@@ -286,3 +328,66 @@ When matching input against a lookup object, use
 `Object.prototype.hasOwnProperty.call(table, key)` rather than `key in table` —
 `in` answers yes for `constructor`, `toString` and friends, which has already
 caused one crash here.
+
+---
+
+# Drawing a cell that is not a square
+
+`ShapesDomRenderer` draws a board of hexagons or triangles, and almost
+everything about it follows from two facts.
+
+**Cells overlap.** A hex row overlaps the one above by a quarter of its
+height; a triangle overlaps its neighbour by half its width. CSS Grid cannot
+express that, so cells are **positioned absolutely** from `layout.origin`,
+which handles all three tilings with one code path.
+
+**A clip-path cannot carry a border**, and a minesweeper cell has to read as
+covered or open, so the outline is not optional. Each cell is a `<button>`
+holding one `<svg>` with a `<polygon>`. The button gives focus, tab order and a
+keyboard press for free; the polygon gives a real outline. Only the polygon
+takes pointer events (`pointer-events: none` on the cell, `auto` on the
+polygon), which is what makes hit testing correct where the boxes overlap —
+`page:shots` checks that every cell hit tests on its outline rather than its
+box. Focus is drawn as a stroke on the polygon, since an `outline` would be
+clipped away.
+
+**Size cells by their inscribed circle, not their edge.** A triangle's
+inscribed circle is 0.577 of its side, so a triangle sized like a square
+slices its own glyphs. `layoutFor(shape, content)` takes that diameter.
+Triangle content sits on the **incentre**, a third of the height from the
+base, so an up-pointing cell's glyph rides low and a down-pointing one's rides
+high.
+
+**Fitting text is per shape, and is not the inscribed circle.** Text is a wide,
+short box. A square or hex is at full width across its middle; a triangle
+closes toward its apex, so what binds there is the box's top corners. Do not
+reach for `content / hypot(w, h)` — it overflows triangles.
+
+**Never hardcode a font metric without measuring it.** Two shipped wrong: the
+numbers are drawn bold, which advances 0.696em per digit rather than the
+0.636em of the regular weight, and Noto's emoji are 1.25em wide rather than
+the 1em of their box. `shapes:check` tests the analytic box against the cell
+outline, and `shots` closes the loop by reading each glyph's real box out of
+the browser.
+
+**Emoji must name an emoji font.** Without one the fallback chain can answer
+with a monochrome glyph from whatever coverage font happens to cover that
+codepoint — the face button first rendered three of its four states as hollow
+outlines while the fourth came out in colour, because Unifont covers the older
+emoji and Noto Color Emoji only got asked for the newer one. `EMOJI_FONT` in
+`svg.ts` is the stack; `shots` checks each glyph came back at the 1.25em the
+emoji font gives, since a wrong width means a wrong font answered.
+
+**Emoji get a dark edge, and it is a filter, not a stroke.** A stroke does
+nothing to a colour emoji, because on most platforms it is a bitmap and a
+bitmap has no path. `glyphOutlineDefs()` dilates the glyph's own alpha, floods
+it dark and puts that behind — which outlines whatever shape the glyph has.
+It is defined once per document and referenced by id, and its width comes off
+the glyph's fit, since an outline makes the mark bigger.
+
+**The number palette is measured, not chosen.** `BOARD_FACE` is the face the
+numbers are drawn on and `svg.ts` takes its revealed face *from* it, so the
+colour they are measured against is by construction the colour they sit on.
+`shapes:check` verifies all twelve clear WCAG AA on it. Retuning a colour for
+separation and forgetting to re-check its contrast is how one shipped at
+4.10:1 while being described as AA — change a colour, run the checks.
