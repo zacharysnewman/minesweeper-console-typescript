@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json",
     "mine": "ts-node src/mining.ts",
-    "mine:check": "ts-node src/Mining/checks.ts"
+    "mine:check": "ts-node src/Mining/checks.ts",
+    "shapes:check": "ts-node src/Shapes/checks.ts"
   },
   "repository": {
     "type": "git",
