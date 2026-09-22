@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shapes</title>
+    <meta
+      name="description"
+      content="Minesweeper on squares, hexagons or triangles: the same rules over three tilings, where a cell touches 8, 6 or 12 others."
+    />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+  </head>
+  <body class="shapes">
+    <h1>Shapes</h1>
+
+    <div class="frame">
+      <div class="hud">
+        <div id="counter" aria-live="polite" aria-label="Mines remaining">000</div>
+        <button id="new-game" type="button">New board</button>
+      </div>
+      <div id="board" role="grid" aria-label="Minefield"></div>
+    </div>
+
+    <div class="controls">
+      <button id="flag-mode" type="button" aria-pressed="false">
+        <span class="flag-icon" aria-hidden="true"></span>
+        Flag mode
+      </button>
+      <label for="shape">Shape</label>
+      <select id="shape">
+        <option value="square">Square &mdash; 8 neighbours</option>
+        <option value="hex">Hexagon &mdash; 6 neighbours</option>
+        <option value="triangle">Triangle &mdash; 12 neighbours</option>
+      </select>
+      <label for="difficulty">Size</label>
+      <select id="difficulty">
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="expert">Expert</option>
+      </select>
+    </div>
+
+    <p id="status" role="status"></p>
+    <p class="hint" id="hint"></p>
+    <p class="shape-note" id="shape-note"></p>
+    <p class="elsewhere">
+      <a href="../">Classic Minesweeper &rarr;</a>
+      &nbsp;&middot;&nbsp;
+      <a href="../mine/">The mining game &rarr;</a>
+    </p>
+
+    <footer>
+      Same rules as
+      <a href="../">Minesweeper</a>, over three tilings. A square has four
+      sides but eight neighbours, because a shared corner counts; a triangle
+      has three sides and twelve neighbours; a hexagon is the one shape where
+      the two numbers agree. Bomb counts are scaled per shape so a board reads
+      about as densely whichever one you pick.
+    </footer>
+
+    <script type="module" src="/src/web/shapes.ts"></script>
+  </body>
+</html>

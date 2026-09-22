@@ -7,13 +7,15 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
-    // Two pages off one set of game rules: the board at /, the mining game at
-    // /mine/. Rollup keeps each entry's directory, so mine/index.html lands at
-    // dist/mine/index.html and the sub path needs no server config.
+    // Three pages off the game rules: the board at /, the mining game at
+    // /mine/, the other tilings at /shapes/. Rollup keeps each entry's
+    // directory, so mine/index.html lands at dist/mine/index.html and the sub
+    // paths need no server config.
     rollupOptions: {
       input: {
         main: "index.html",
         mine: "mine/index.html",
+        shapes: "shapes/index.html",
       },
     },
   },

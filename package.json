@@ -13,7 +13,8 @@
     "mine:check": "ts-node src/Mining/checks.ts",
     "shapes:check": "ts-node src/Shapes/checks.ts",
     "specimen": "ts-node scripts/specimen.ts",
-    "shots": "npm run specimen && ts-node scripts/shots.ts"
+    "shots": "npm run specimen && ts-node scripts/shots.ts",
+    "page:shots": "npm run build && ts-node scripts/page-shots.ts"
   },
   "repository": {
     "type": "git",

@@ -13,7 +13,8 @@ import { winLoseCheck } from "../State/winLoseCheck";
 import { WinLoseStatus } from "../State/WinLoseStatus";
 import { Board } from "./Board";
 import { BoardInfo } from "./BoardInfo";
-import { NUMBER_COLORS } from "./numberPalette";
+import { BOARD_FACE, NUMBER_COLORS } from "./numberPalette";
+import { FACE_REVEALED } from "./svg";
 import { PRESETS, PRESET_NAMES } from "./presets";
 import {
   ActivateCellEvent,
@@ -355,6 +356,42 @@ for (const shape of allShapes) {
       (n) => typeof NUMBER_COLORS[n] === "string"
     )
   );
+
+  check(
+    "the numbers are drawn on the face the palette is measured against",
+    FACE_REVEALED === BOARD_FACE
+  );
+
+  // Retuning a colour for separation and forgetting to re-check its contrast
+  // is how #005c7a shipped at 4.10:1 while being described as AA. The check
+  // belongs here rather than in anybody's memory.
+  const relativeLuminance = (hex: string): number => {
+    const value = parseInt(hex.slice(1), 16);
+    const channel = (c: number): number => {
+      const s = c / 255;
+      return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    };
+    return (
+      0.2126 * channel((value >> 16) & 255) +
+      0.7152 * channel((value >> 8) & 255) +
+      0.0722 * channel(value & 255)
+    );
+  };
+  const contrast = (a: string, b: string): number => {
+    const [x, y] = [relativeLuminance(a), relativeLuminance(b)];
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+
+  for (const face of [BOARD_FACE, "#c0c0c0"]) {
+    const worst = Object.keys(NUMBER_COLORS)
+      .map(Number)
+      .map((n) => [n, contrast(NUMBER_COLORS[n], face)] as [number, number])
+      .sort((a, b) => a[1] - b[1])[0];
+    check(
+      `every number clears WCAG AA on ${face} (worst is ${worst[0]} at ${worst[1].toFixed(2)}:1)`,
+      worst[1] >= 4.5
+    );
+  }
 }
 
 console.log("\ncell art fits its outline\n");

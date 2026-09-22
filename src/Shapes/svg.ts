@@ -4,7 +4,7 @@ import { TileState } from "../State/TileState";
 import { WinLoseStatus } from "../State/WinLoseStatus";
 import { Board } from "./Board";
 import { layoutFor, digitFontSize, glyphFontSize, Layout } from "./geometry";
-import { colorForCount } from "./numberPalette";
+import { BOARD_FACE, colorForCount } from "./numberPalette";
 
 // Board markup as a string, with no DOM calls, so the same drawing runs in a
 // browser and in the screenshot harness.
@@ -23,11 +23,17 @@ export const GLYPHS = {
   wrongFlag: "❌",
 } as const;
 
-export const FACE_HIDDEN = "#c0c0c0";
-export const FACE_REVEALED = "#d6d6d6";
+// A covered cell cannot carry a bevel the way a square sprite can, so raised
+// against flat is carried by value instead: covered is darker than the face
+// that opens under it, and wears a light edge where a bevel would catch the
+// light.
+export const FACE_HIDDEN = "#b5b5b5";
+// Taken from the palette rather than declared here, so the numbers are always
+// drawn on the face their contrast was measured against.
+export const FACE_REVEALED = BOARD_FACE;
 export const FACE_DETONATED = "#d08b8b";
-export const EDGE_LIGHT = "#ffffff";
-export const EDGE_DARK = "#7b7b7b";
+export const EDGE_LIGHT = "#eaeaea";
+export const EDGE_DARK = "#9a9a9a";
 
 export interface CellArt {
   readonly face: string;
@@ -125,4 +131,36 @@ export function boardSvg(board: Board, content: number): string {
   const w = layout.boardWidth(board.info.cols);
   const h = layout.boardHeight(board.info.rows);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(2)} ${h.toFixed(2)}">${cells}</svg>`;
+}
+
+// A single cell as a standalone <svg>, sized and positioned by its own
+// bounding box. The viewBox is the cell's box in board coordinates, so the
+// polygon and text keep the absolute coordinates the layout gives them and
+// need no second, local coordinate system.
+//
+// The polygon takes pointer events and the svg around it does not, which is
+// what makes hit testing correct where bounding boxes overlap: a hex row
+// overlaps the one above by a quarter, and a triangle overlaps its
+// neighbour by half.
+export function cellElementSvg(
+  layout: Layout,
+  coords: Coords,
+  art: CellArt
+): string {
+  const o = layout.origin(coords);
+  const w = layout.cellWidth;
+  const h = layout.cellHeight;
+  return (
+    `<svg viewBox="${o.x.toFixed(2)} ${o.y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}" ` +
+    `width="${w.toFixed(2)}" height="${h.toFixed(2)}" ` +
+    `xmlns="http://www.w3.org/2000/svg" focusable="false">` +
+    cellSvg(layout, coords, art) +
+    `</svg>`
+  );
+}
+
+// What a cell is showing, as a short string, so a renderer can skip rewriting
+// the cells whose art has not changed.
+export function artKey(art: CellArt): string {
+  return `${art.face}|${art.glyph ?? ""}|${art.count ?? ""}`;
 }

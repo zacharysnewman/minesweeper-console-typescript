@@ -1,0 +1,81 @@
+/* Scoped to this page; styles.css is loaded by every page. */
+body.shapes {
+  background: #2f2f2f;
+}
+
+body.shapes .frame {
+  padding: 10px;
+  /* Cells shrink to fit the window, but only down to a readable size; past
+     that a big board scrolls rather than turning into confetti. */
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Cells are positioned from the layout, so the board is a positioning
+   context and nothing else. Its size is set by the renderer. */
+body.shapes #board {
+  position: relative;
+  display: block;
+  border: 0;
+  margin-inline: auto;
+  touch-action: manipulation;
+}
+
+.shape-cell {
+  position: absolute;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+  /* The bounding boxes overlap for hex and triangle, so the box itself must
+     not take pointer events -- only the outline inside it does. */
+  pointer-events: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shape-cell svg {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.shape-cell polygon {
+  pointer-events: auto;
+}
+
+#board.is-over .shape-cell {
+  cursor: default;
+}
+
+/* An outline would be clipped away by the cell's own shape, so the focus ring
+   is drawn on the outline itself. */
+.shape-cell:focus {
+  outline: none;
+}
+
+.shape-cell:focus-visible polygon {
+  stroke: #1e88ff;
+  stroke-width: 3;
+}
+
+body.shapes .controls {
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+body.shapes .hud {
+  justify-content: space-between;
+}
+
+body.shapes .shape-note {
+  font-size: 0.78rem;
+  color: #b8b8b8;
+  max-width: 62ch;
+  text-align: center;
+  margin: 0;
+}

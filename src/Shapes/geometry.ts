@@ -27,6 +27,10 @@ export interface Layout {
   readonly cellHeight: number;
   boardWidth(cols: number): number;
   boardHeight(rows: number): number;
+  // The cell's bounding box on the board. Cells overlap for hex and triangle,
+  // so a renderer that positions boxes absolutely needs this as well as the
+  // outline that sits inside it.
+  origin(coords: Coords): Point;
   // The cell outline, in board space.
   polygon(coords: Coords): Point[];
   // Where a glyph goes. Not the centre of the bounding box for a triangle:
@@ -43,6 +47,7 @@ function squareLayout(content: number): Layout {
   return {
     shape: Shape.square,
     content,
+    origin,
     cellWidth: s,
     cellHeight: s,
     boardWidth: (cols) => cols * s,
@@ -78,6 +83,7 @@ function hexLayout(content: number): Layout {
   return {
     shape: Shape.hex,
     content,
+    origin,
     cellWidth: w,
     cellHeight: h,
     boardWidth: (cols) => cols * w + w / 2,
@@ -112,6 +118,7 @@ function triangleLayout(content: number): Layout {
   return {
     shape: Shape.triangle,
     content,
+    origin,
     cellWidth: side,
     cellHeight: h,
     boardWidth: (cols) => (cols + 1) * colStep,
