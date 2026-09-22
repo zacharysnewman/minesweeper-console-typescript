@@ -60,6 +60,7 @@ const renderer = new ShapesDomRenderer(
     board: requireElement("board"),
     counter: requireElement("counter"),
     status: requireElement("status"),
+    face: requireElement<HTMLButtonElement>("face"),
   },
   (coords: Coords, flagMode: boolean) => {
     EventAggregator.get(ActivateCellEvent).publish(coords, flagMode);
@@ -114,7 +115,7 @@ function updateHint(): void {
 ShapeGame.init();
 renderer.init();
 
-requireElement("new-game").addEventListener("click", () => newBoard());
+requireElement("face").addEventListener("click", () => newBoard());
 shapeSelect.addEventListener("change", () => newBoard());
 difficultySelect.addEventListener("change", () => newBoard());
 

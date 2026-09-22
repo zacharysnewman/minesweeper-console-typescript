@@ -26,6 +26,7 @@ import { allShapes, Shape, shapeName } from "./Shape";
 import {
   digitBoxEm,
   glyphBoxEm,
+  GLYPH_OUTLINE_PX,
   layoutFor,
   textBoxFits,
 } from "./geometry";
@@ -426,12 +427,13 @@ for (const shape of allShapes) {
       )
     );
     check(
-      `${label}: an emoji glyph stays inside the cell`,
+      `${label}: an emoji glyph and its outline stay inside the cell`,
       textBoxFits(
         layout,
         coords,
         glyphBoxEm().width,
-        glyphBoxEm().height
+        glyphBoxEm().height,
+        GLYPH_OUTLINE_PX
       )
     );
   }

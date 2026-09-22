@@ -189,9 +189,10 @@ const FILL = 0.82;
 export function fitFontSize(
   layout: Layout,
   widthEm: number,
-  heightEm: number
+  heightEm: number,
+  inset = 0
 ): number {
-  const c = layout.content;
+  const c = layout.content - 2 * inset;
   switch (layout.shape) {
     case Shape.hex: {
       // Full width across the middle half of the height, then closing toward
@@ -234,9 +235,13 @@ export function digitFontSize(layout: Layout, digits: number): number {
   return fitFontSize(layout, box.width, box.height);
 }
 
+// Glyphs are drawn with a dark outline around them, which grows the mark by
+// its width on every side, so the room it takes has to come off the fit.
+export const GLYPH_OUTLINE_PX = 1.25;
+
 export function glyphFontSize(layout: Layout): number {
   const box = glyphBoxEm();
-  return fitFontSize(layout, box.width, box.height);
+  return fitFontSize(layout, box.width, box.height, GLYPH_OUTLINE_PX);
 }
 
 // True when every corner of the text box lies inside the cell outline.
@@ -244,12 +249,14 @@ export function textBoxFits(
   layout: Layout,
   coords: Coords,
   widthEm: number,
-  heightEm: number
+  heightEm: number,
+  inset = 0
 ): boolean {
-  const size = fitFontSize(layout, widthEm, heightEm);
+  const size = fitFontSize(layout, widthEm, heightEm, inset);
   const centre = layout.center(coords);
-  const halfWidth = (widthEm * size) / 2;
-  const halfHeight = (heightEm * size) / 2;
+  // The outline counts: what has to clear the cell is the mark plus its edge.
+  const halfWidth = (widthEm * size) / 2 + inset;
+  const halfHeight = (heightEm * size) / 2 + inset;
   const corners: Point[] = [
     { x: centre.x - halfWidth, y: centre.y - halfHeight },
     { x: centre.x + halfWidth, y: centre.y - halfHeight },

@@ -8,7 +8,14 @@ import { layoutFor, Layout } from "../Shapes/geometry";
 import { Shape } from "../Shapes/Shape";
 import { ShapeState } from "../Shapes/ShapeState";
 import { ShapeStateChangedEvent } from "../Shapes/ShapeEvents";
-import { artKey, cellArt, cellElementSvg } from "../Shapes/svg";
+import {
+  artKey,
+  cellArt,
+  cellElementSvg,
+  FaceKind,
+  FACES,
+  glyphOutlineDefs,
+} from "../Shapes/svg";
 
 export type ActivateHandler = (coords: Coords, flagMode: boolean) => void;
 
@@ -16,6 +23,7 @@ export interface ShapesDomRendererElements {
   board: HTMLElement;
   counter: HTMLElement;
   status: HTMLElement;
+  face: HTMLButtonElement;
 }
 
 interface PointerGesture {
@@ -76,6 +84,14 @@ export class ShapesDomRenderer {
   public init(): void {
     EventAggregator.get(ShapeStateChangedEvent).subscribe(this.onStateChanged);
     this.bindBoardEvents();
+    // One copy of the glyph outline filter for the whole document; every cell
+    // references it by id.
+    this.elements.board.insertAdjacentHTML("beforebegin", glyphOutlineDefs());
+    this.setFace("active");
+  }
+
+  private setFace(kind: FaceKind): void {
+    this.elements.face.textContent = FACES[kind];
   }
 
   public setFlagMode(on: boolean): void {
@@ -107,6 +123,7 @@ export class ShapesDomRenderer {
     this.gameOver = false;
     this.cancelGesture();
     this.elements.board.classList.remove("is-over");
+    this.setFace("active");
     this.setStatus(WinLoseStatus.none);
   }
 
@@ -159,6 +176,7 @@ export class ShapesDomRenderer {
       timer: null,
       resolved: false,
     };
+    this.setFace("pressing");
     gesture.timer = window.setTimeout(() => {
       gesture.resolved = true;
       gesture.timer = null;
@@ -187,6 +205,7 @@ export class ShapesDomRenderer {
     if (gesture === null || gesture.id !== event.pointerId) return;
     this.clearGestureTimer(gesture);
     this.gesture = null;
+    this.releaseFace();
     if (gesture.resolved) return;
     this.dispatch(gesture.coords, false);
   };
@@ -195,7 +214,14 @@ export class ShapesDomRenderer {
     if (this.gesture === null) return;
     this.clearGestureTimer(this.gesture);
     this.gesture = null;
+    this.releaseFace();
   };
+
+  private releaseFace(): void {
+    if (!this.gameOver) {
+      this.setFace("active");
+    }
+  }
 
   private clearGestureTimer(gesture: PointerGesture): void {
     if (gesture.timer !== null) {
@@ -253,6 +279,13 @@ export class ShapesDomRenderer {
       this.cancelGesture();
     }
     this.elements.board.classList.toggle("is-over", this.gameOver);
+    this.setFace(
+      status === WinLoseStatus.win
+        ? "won"
+        : status === WinLoseStatus.lose
+        ? "lost"
+        : "active"
+    );
 
     this.ensureGrid(shape, rows, cols);
     const layout = this.layout as Layout;

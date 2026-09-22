@@ -370,6 +370,21 @@ the 1em of their box. `shapes:check` tests the analytic box against the cell
 outline, and `shots` closes the loop by reading each glyph's real box out of
 the browser.
 
+**Emoji must name an emoji font.** Without one the fallback chain can answer
+with a monochrome glyph from whatever coverage font happens to cover that
+codepoint — the face button first rendered three of its four states as hollow
+outlines while the fourth came out in colour, because Unifont covers the older
+emoji and Noto Color Emoji only got asked for the newer one. `EMOJI_FONT` in
+`svg.ts` is the stack; `shots` checks each glyph came back at the 1.25em the
+emoji font gives, since a wrong width means a wrong font answered.
+
+**Emoji get a dark edge, and it is a filter, not a stroke.** A stroke does
+nothing to a colour emoji, because on most platforms it is a bitmap and a
+bitmap has no path. `glyphOutlineDefs()` dilates the glyph's own alpha, floods
+it dark and puts that behind — which outlines whatever shape the glyph has.
+It is defined once per document and referenced by id, and its width comes off
+the glyph's fit, since an outline makes the mark bigger.
+
 **The number palette is measured, not chosen.** `BOARD_FACE` is the face the
 numbers are drawn on and `svg.ts` takes its revealed face *from* it, so the
 colour they are measured against is by construction the colour they sit on.

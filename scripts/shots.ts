@@ -118,6 +118,18 @@ async function main(): Promise<void> {
             `(ink ${box.width.toFixed(1)}x${inkHeight.toFixed(1)})`
         );
       }
+      // An emoji that came back at the wrong width was answered by some
+      // other font than the one its size was derived from -- which is what a
+      // monochrome fallback looks like from here.
+      if (text.getAttribute("data-ink") === "box") {
+        const em = box.width / size;
+        if (Math.abs(em - 1.25) > 0.12) {
+          bad.push(
+            `${text.textContent ?? "?"} measured ${em.toFixed(2)}em wide, ` +
+              `not the 1.25em of the emoji font -- wrong font answered`
+          );
+        }
+      }
     });
     return bad;
   });

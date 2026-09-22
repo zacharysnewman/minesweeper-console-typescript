@@ -7,7 +7,14 @@ import { WinLoseStatus } from "../src/State/WinLoseStatus";
 import { allShapes, Shape, shapeName } from "../src/Shapes/Shape";
 import { layoutFor } from "../src/Shapes/geometry";
 import { topologyFor } from "../src/Shapes/Topology";
-import { cellArt, cellSvg, GLYPHS, FACE_HIDDEN } from "../src/Shapes/svg";
+import {
+  cellArt,
+  cellSvg,
+  FACES,
+  GLYPHS,
+  FACE_HIDDEN,
+  glyphOutlineDefs,
+} from "../src/Shapes/svg";
 import { NUMBER_COLORS } from "../src/Shapes/numberPalette";
 
 // Draws every cell a board can show, on every shape, so the art can be looked
@@ -135,6 +142,18 @@ function swatches(): string {
   return `<section><h2>number palette <span class="meta">on the #c0c0c0 face</span></h2><div class="row">${cells}</div></section>`;
 }
 
+// The button above the board, in each of its states.
+function faces(): string {
+  const cells = (Object.keys(FACES) as (keyof typeof FACES)[])
+    .map(
+      (kind) =>
+        `<figure><div class="face">${FACES[kind]}</div>` +
+        `<figcaption>${kind}</figcaption></figure>`
+    )
+    .join("");
+  return `<section><h2>face button <span class="meta">new board, and how the game is going</span></h2><div class="row">${cells}</div></section>`;
+}
+
 const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8" />
 <title>Shape specimen</title>
@@ -150,14 +169,20 @@ const html = `<!doctype html>
   .cell { background: ${FACE_HIDDEN}; padding: 3px; display: inline-flex; }
   .swatch { background: ${FACE_HIDDEN}; width: 48px; height: 48px; display: grid;
             place-items: center; font-size: 26px; font-weight: 700; }
+  .face { background: #c0c0c0; width: 48px; height: 48px; display: grid;
+          place-items: center; font-size: 28px; line-height: 1;
+          font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif;
+          border: 3px solid; border-color: #fff #808080 #808080 #fff; }
   figcaption { font-size: .66rem; color: #c8c8c8; margin-top: 3px; }
   .note { font-size: .78rem; color: #b8b8b8; max-width: 70ch; }
 </style></head>
 <body>
+${glyphOutlineDefs()}
 <h1>Shape specimen</h1>
-<p class="note">Every cell state on every tiling, each drawn alone. Glyphs are ${GLYPHS.flag} ${GLYPHS.bomb} ${GLYPHS.detonated} ${GLYPHS.wrongFlag}; numbers are text. Cells are sized so their inscribed circle is the same ${CONTENT}px on all three shapes, which is what makes a glyph the same size in each.</p>
+<p class="note">Every cell state on every tiling, each drawn alone. Glyphs are ${GLYPHS.flag} ${GLYPHS.bomb} ${GLYPHS.detonated} ${GLYPHS.wrongFlag}, each with a dark edge dilated from its own alpha so it reads against the face; numbers are text. Cells are sized so their inscribed circle is the same ${CONTENT}px on all three shapes, which is what makes a glyph the same size in each.</p>
 ${allShapes.map(section).join("")}
 ${swatches()}
+${faces()}
 </body></html>`;
 
 const out = path.join(__dirname, "..", ".specimen");

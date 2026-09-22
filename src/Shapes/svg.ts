@@ -3,7 +3,13 @@ import { Tile } from "../State/Tile";
 import { TileState } from "../State/TileState";
 import { WinLoseStatus } from "../State/WinLoseStatus";
 import { Board } from "./Board";
-import { layoutFor, digitFontSize, glyphFontSize, Layout } from "./geometry";
+import {
+  layoutFor,
+  digitFontSize,
+  glyphFontSize,
+  GLYPH_OUTLINE_PX,
+  Layout,
+} from "./geometry";
 import { BOARD_FACE, colorForCount } from "./numberPalette";
 
 // Board markup as a string, with no DOM calls, so the same drawing runs in a
@@ -22,6 +28,53 @@ export const GLYPHS = {
   detonated: "\u{1F4A5}",
   wrongFlag: "❌",
 } as const;
+
+// The button above the board, as the original game had it: watching, caught
+// mid-press, dead, and pleased with itself.
+export const FACES = {
+  active: "\u{1F642}",
+  pressing: "\u{1F62E}",
+  lost: "\u{1F635}",
+  won: "\u{1F60E}",
+} as const;
+
+export type FaceKind = keyof typeof FACES;
+
+// Emoji must name an emoji font, or the fallback chain can answer with a
+// monochrome glyph from some coverage font that happens to cover the
+// codepoint -- which is how the face button first rendered three of its four
+// states as hollow outlines while the fourth came out in colour. It also
+// pins the metrics: the glyph sizes are derived from Noto's proportions, so
+// Noto is what should be asked for.
+export const EMOJI_FONT =
+  '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji","Twemoji Mozilla",sans-serif';
+
+export const GLYPH_OUTLINE_ID = "shape-glyph-outline";
+export const GLYPH_OUTLINE_COLOR = "#241f1c";
+
+// A dark edge around the emoji, so they read against the face instead of
+// dissolving into it.
+//
+// A stroke will not do it: colour emoji are bitmap glyphs on most platforms,
+// and a bitmap has no path to stroke. Dilating the alpha channel, flooding it
+// dark and putting that behind the original outlines whatever shape the glyph
+// actually has, bitmap or not.
+//
+// One definition for the whole document, referenced by id from every cell --
+// a filter repeated in nine hundred inline svgs would be nine hundred copies.
+export function glyphOutlineDefs(): string {
+  return (
+    `<svg width="0" height="0" aria-hidden="true" focusable="false" ` +
+    `style="position:absolute" xmlns="http://www.w3.org/2000/svg"><defs>` +
+    `<filter id="${GLYPH_OUTLINE_ID}" x="-35%" y="-35%" width="170%" height="170%">` +
+    `<feMorphology in="SourceAlpha" operator="dilate" ` +
+    `radius="${GLYPH_OUTLINE_PX}" result="thick" />` +
+    `<feFlood flood-color="${GLYPH_OUTLINE_COLOR}" result="ink" />` +
+    `<feComposite in="ink" in2="thick" operator="in" result="edge" />` +
+    `<feMerge><feMergeNode in="edge" /><feMergeNode in="SourceGraphic" /></feMerge>` +
+    `</filter></defs></svg>`
+  );
+}
 
 // A covered cell cannot carry a bevel the way a square sprite can, so raised
 // against flat is carried by value instead: covered is darker than the face
@@ -94,7 +147,9 @@ export function cellSvg(
     parts.push(
       `<text x="${centre.x.toFixed(2)}" y="${centre.y.toFixed(2)}" ` +
         `font-size="${size.toFixed(2)}" text-anchor="middle" ` +
-        `dominant-baseline="central" data-ink="box">${art.glyph}</text>`
+        `dominant-baseline="central" data-ink="box" ` +
+        `font-family='${EMOJI_FONT}' ` +
+        `filter="url(#${GLYPH_OUTLINE_ID})">${art.glyph}</text>`
     );
   } else if (art.count !== undefined) {
     const digits = String(art.count).length;

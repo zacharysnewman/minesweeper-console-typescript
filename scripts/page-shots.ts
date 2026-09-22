@@ -197,6 +197,33 @@ async function main(): Promise<void> {
     }
   }
 
+  // Play until it ends, so the face button and the reveal-everything state
+  // get looked at rather than assumed.
+  await page.goto(`${site.url}shapes/`);
+  await page.selectOption("#shape", "hex");
+  await page.selectOption("#difficulty", "beginner");
+  await page.waitForTimeout(120);
+  for (let i = 0; i < 90; i++) {
+    const done = await page.evaluate(() => document.querySelector("#board.is-over") !== null);
+    if (done) break;
+    const next = await page.evaluate(() => {
+      const cells = Array.from(document.querySelectorAll(".shape-cell"));
+      return cells.findIndex((c) => (c.getAttribute("aria-label") ?? "").endsWith("covered"));
+    });
+    if (next < 0) break;
+    await page.locator(".shape-cell").nth(next).locator("polygon").click();
+    await page.waitForTimeout(20);
+  }
+  const face = await page.evaluate(() => ({
+    glyph: document.getElementById("face")?.textContent ?? "",
+    status: document.getElementById("status")?.textContent ?? "",
+  }));
+  await page.locator(".frame").screenshot({ path: path.join(out, "endgame.png") });
+  console.log(`endgame: status "${face.status}", face ${face.glyph}`);
+  if (face.status === "") {
+    problems.push("the game never ended, so the face button was not exercised");
+  }
+
   // The heaviest board, timed: 960 cells, each its own button and svg.
   await page.goto(`${site.url}shapes/`);
   await page.selectOption("#shape", "triangle");
