@@ -163,6 +163,22 @@ async function main(): Promise<void> {
   const page = await context.newPage();
 
   const problems: string[] = [];
+
+  // The page booting at all is the thing most worth checking: a script that
+  // never runs leaves a styled page with an empty board, which looks like a
+  // layout bug rather than a missing script.
+  await page.goto(`${site.url}shapes/`);
+  await page.waitForTimeout(400);
+  const boot = await page.evaluate(() => ({
+    booted: (window as unknown as { shapesBooted?: boolean }).shapesBooted === true,
+    cells: document.querySelectorAll(".shape-cell").length,
+    face: document.getElementById("face")?.textContent ?? "",
+    status: document.getElementById("status")?.textContent ?? "",
+  }));
+  if (!boot.booted) problems.push(`the page did not boot (status: "${boot.status}")`);
+  if (boot.cells === 0) problems.push("the board rendered no cells");
+  if (boot.face === "") problems.push("the face button is empty");
+
   for (const shape of ["square", "hex", "triangle"]) {
     for (const size of ["beginner", "expert"]) {
       problems.push(...(await shoot(page, site.url, shape, size)));
