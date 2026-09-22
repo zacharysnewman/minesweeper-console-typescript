@@ -11,7 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.web.json",
     "mine": "ts-node src/mining.ts",
     "mine:check": "ts-node src/Mining/checks.ts",
-    "shapes:check": "ts-node src/Shapes/checks.ts"
+    "shapes:check": "ts-node src/Shapes/checks.ts",
+    "specimen": "ts-node scripts/specimen.ts",
+    "shots": "npm run specimen && ts-node scripts/shots.ts"
   },
   "repository": {
     "type": "git",
@@ -30,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^22.7.5",
     "@types/readline-sync": "^1.4.4",
+    "playwright": "^1.63.0",
     "ts-node": "^10.2.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"

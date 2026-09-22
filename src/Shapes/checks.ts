@@ -22,6 +22,12 @@ import {
 } from "./ShapeEvents";
 import { ShapeGame } from "./ShapeGame";
 import { allShapes, Shape, shapeName } from "./Shape";
+import {
+  digitBoxEm,
+  glyphBoxEm,
+  layoutFor,
+  textBoxFits,
+} from "./geometry";
 import { topologyFor } from "./Topology";
 
 // The project has no test runner, so the shape rules check themselves:
@@ -349,6 +355,49 @@ for (const shape of allShapes) {
       (n) => typeof NUMBER_COLORS[n] === "string"
     )
   );
+}
+
+console.log("\ncell art fits its outline\n");
+
+for (const shape of allShapes) {
+  const name = shapeName(shape);
+  const layout = layoutFor(shape, 34);
+  // A triangle's two orientations put the content centre in different places,
+  // so both have to be checked. (0,0) points up and (0,1) points down; for the
+  // other shapes the second is just another cell.
+  const orientations: [string, Coords][] = [
+    ["point up", new Coords(0, 0)],
+    ["point down", new Coords(0, 1)],
+  ];
+
+  for (const [orientation, coords] of orientations) {
+    const label = shape === Shape.triangle ? `${name} ${orientation}` : name;
+    if (shape !== Shape.triangle && orientation === "point down") {
+      continue;
+    }
+
+    // Counts run to the shape's degree, so only a triangle needs two digits.
+    const widest = topologyFor(shape).degree;
+    const digits = String(widest).length;
+    check(
+      `${label}: a ${digits}-digit number stays inside the cell`,
+      textBoxFits(
+        layout,
+        coords,
+        digitBoxEm(digits).width,
+        digitBoxEm(digits).height
+      )
+    );
+    check(
+      `${label}: an emoji glyph stays inside the cell`,
+      textBoxFits(
+        layout,
+        coords,
+        glyphBoxEm().width,
+        glyphBoxEm().height
+      )
+    );
+  }
 }
 
 console.log("\nseparation from the square game\n");
