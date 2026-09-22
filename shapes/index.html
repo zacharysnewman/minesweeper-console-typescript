@@ -70,7 +70,7 @@
     <script>
       (function () {
         function show(text) {
-          if (window.shapesBooted) return;
+          if (window.pageBooted) return;
           var status = document.getElementById("status");
           if (!status || status.dataset.bootFailed) return;
           status.dataset.bootFailed = "1";

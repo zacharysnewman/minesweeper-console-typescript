@@ -152,12 +152,12 @@ function start(): void {
   });
 }
 
-type BootWindow = Window & { shapesBooted?: boolean };
+type BootWindow = Window & { pageBooted?: boolean };
 
 try {
   start();
   // Tells the watchdog in the page that the script arrived and ran.
-  (window as BootWindow).shapesBooted = true;
+  (window as BootWindow).pageBooted = true;
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error);
   const status = document.getElementById("status");

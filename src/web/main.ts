@@ -74,3 +74,8 @@ difficultySelect.addEventListener("change", () => {
 
 difficultySelect.value = DEFAULT_DIFFICULTY;
 newGame(DIFFICULTIES[DEFAULT_DIFFICULTY]);
+
+// Tells the watchdog in the page that the script arrived and ran. Without it
+// a page whose script 404s -- which is what a stale index.html pointing at a
+// replaced build looks like -- is just a styled page with nothing on it.
+(window as Window & { pageBooted?: boolean }).pageBooted = true;
