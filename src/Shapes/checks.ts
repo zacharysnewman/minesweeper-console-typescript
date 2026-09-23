@@ -24,13 +24,27 @@ import {
 import { ShapeGame } from "./ShapeGame";
 import { allShapes, Shape, shapeName } from "./Shape";
 import {
+  chebyshevCenter,
   digitBoxEm,
+  fitTextInPolygon,
   glyphBoxEm,
   GLYPH_OUTLINE_PX,
   layoutFor,
-  textBoxFits,
+  Point,
+  contentFitsCell,
+  centroidOf,
 } from "./geometry";
-import { topologyFor } from "./Topology";
+import {
+  checkCoverage,
+  deriveOffsets,
+  fundamentalArea,
+  polygonsTouch,
+  rotateTiling,
+  Tiling,
+} from "./Tiling";
+import { pentagonTilings } from "./pentagons";
+import { TILINGS, topologyFor } from "./Topology";
+import { layoutFor as layoutForShape } from "./geometry";
 
 // The project has no test runner, so the shape rules check themselves:
 // `npm run shapes:check`. The adjacency properties below are the point of the
@@ -48,6 +62,42 @@ function check(label: string, ok: boolean): void {
 }
 
 const key = (c: Coords): string => `${c.x},${c.y}`;
+
+function areaOf(polygon: readonly Point[]): number {
+  let total = 0;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    total += polygon[j].x * polygon[i].y - polygon[i].x * polygon[j].y;
+  }
+  return Math.abs(total) / 2;
+}
+
+function isConvex(polygon: readonly Point[]): boolean {
+  let sign = 0;
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    const c = polygon[(i + 2) % polygon.length];
+    const turn =
+      (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(turn) < 1e-12) {
+      continue;
+    }
+    const next = Math.sign(turn);
+    if (sign === 0) {
+      sign = next;
+    } else if (next !== sign) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Scale a unit polygon so its inscribed circle is `content` across, the way a
+// board sizes its cells.
+function scaleTo(polygon: readonly Point[], content: number): Point[] {
+  const factor = content / 2 / chebyshevCenter(polygon).radius;
+  return polygon.map((p) => ({ x: p.x * factor, y: p.y * factor }));
+}
 
 // Builds a board from rows of glyphs, the way Mining/checks.ts does.
 // '#' hidden, '.' revealed, '!' flagged, '*' hidden bomb, ',' revealed bomb.
@@ -87,8 +137,13 @@ console.log("\nadjacency properties\n");
 for (const shape of allShapes) {
   const topology = topologyFor(shape);
   const name = shapeName(shape);
-  // A patch big enough that the middle of it is nowhere near an edge.
-  const span = 12;
+  // A patch big enough that the middle of it is nowhere near an edge. A
+  // tiling's neighbours reach into the next primitive unit, so "near an edge"
+  // is measured in units and not in cells: twelve columns of a six-cell unit
+  // is two units across, and almost nothing in it is interior at all.
+  const unitCells = TILINGS[shape]?.cells ?? 1;
+  const span = 12 * unitCells;
+  const margin = 3 * unitCells;
   const cells: Coords[] = [];
   for (let x = 0; x < span; x++) {
     for (let y = 0; y < span; y++) {
@@ -110,8 +165,8 @@ for (const shape of allShapes) {
   );
 
   check(
-    `${name}: every cell lists exactly ${topology.degree} neighbours`,
-    cells.every((c) => topology.neighbours(c).length === topology.degree)
+    `${name}: every cell lists exactly the neighbours its degree says`,
+    cells.every((c) => topology.neighbours(c).length === topology.degreeAt(c))
   );
 
   // The one that matters: b is a's neighbour if and only if a is b's. A table
@@ -129,11 +184,17 @@ for (const shape of allShapes) {
 
   // Degree counted on a real board, away from the edges, is the same number.
   const b = Board.generateNewBoard(new BoardInfo(span, span, 0, shape));
+  const interior = cells.filter(
+    (c) =>
+      c.x >= margin &&
+      c.x < span - margin &&
+      c.y >= margin &&
+      c.y < span - margin
+  );
   check(
-    `${name}: interior cells on a board have ${topology.degree} neighbours`,
-    cells
-      .filter((c) => c.x >= 2 && c.x < span - 2 && c.y >= 2 && c.y < span - 2)
-      .every((c) => b.neighbours(c).length === topology.degree)
+    `${name}: interior cells on a board keep their full degree (${interior.length} of them)`,
+    interior.length > 0 &&
+      interior.every((c) => b.neighbours(c).length === topology.degreeAt(c))
   );
 
   check(
@@ -326,6 +387,16 @@ for (const shape of allShapes) {
       return info !== undefined && info.shape === shape;
     })
   );
+  // A tiling repeats a primitive unit, so a board that ends mid-unit would
+  // have cells whose neighbours were never placed.
+  const tiling = TILINGS[shape];
+  if (tiling !== undefined) {
+    check(
+      `${name}: every preset holds a whole number of primitive units`,
+      PRESET_NAMES.every((p) => PRESETS[shape][p].cols % tiling.cells === 0)
+    );
+  }
+
   check(
     `${name}: no preset asks for more bombs than it has cells`,
     PRESET_NAMES.every((p) => {
@@ -403,14 +474,28 @@ for (const shape of allShapes) {
   // A triangle's two orientations put the content centre in different places,
   // so both have to be checked. (0,0) points up and (0,1) points down; for the
   // other shapes the second is just another cell.
-  const orientations: [string, Coords][] = [
-    ["point up", new Coords(0, 0)],
-    ["point down", new Coords(0, 1)],
-  ];
+  const tiling = TILINGS[shape];
+  const orientations: [string, Coords][] =
+    tiling !== undefined
+      ? Array.from({ length: tiling.cells }, (_unused, i) => [
+          `cell ${i + 1} of the unit`,
+          new Coords(0, i),
+        ])
+      : [
+          ["point up", new Coords(0, 0)],
+          ["point down", new Coords(0, 1)],
+        ];
 
   for (const [orientation, coords] of orientations) {
-    const label = shape === Shape.triangle ? `${name} ${orientation}` : name;
-    if (shape !== Shape.triangle && orientation === "point down") {
+    const label =
+      shape === Shape.triangle || tiling !== undefined
+        ? `${name} ${orientation}`
+        : name;
+    if (
+      tiling === undefined &&
+      shape !== Shape.triangle &&
+      orientation === "point down"
+    ) {
       continue;
     }
 
@@ -419,22 +504,276 @@ for (const shape of allShapes) {
     const digits = String(widest).length;
     check(
       `${label}: a ${digits}-digit number stays inside the cell`,
-      textBoxFits(
-        layout,
-        coords,
-        digitBoxEm(digits).width,
-        digitBoxEm(digits).height
-      )
+      contentFitsCell(layout, coords, "digits", digits)
     );
     check(
       `${label}: an emoji glyph and its outline stay inside the cell`,
-      textBoxFits(
-        layout,
-        coords,
-        glyphBoxEm().width,
-        glyphBoxEm().height,
-        GLYPH_OUTLINE_PX
+      contentFitsCell(layout, coords, "glyph")
+    );
+  }
+}
+
+console.log("\nnumbers centred and all one size\n");
+
+for (const shape of allShapes) {
+  const name = shapeName(shape);
+  const layout = layoutFor(shape, 34);
+  const cells = TILINGS[shape]?.cells ?? 2;
+  const at = Array.from({ length: cells }, (_unused, i) => new Coords(0, i));
+
+  // Cells of one unit are usually congruent, but a horizontal box does not
+  // fit a turned copy the same way, so the sizes have to be levelled or the
+  // board shows numbers of visibly different sizes. A house-shaped pentagon
+  // was 23% apart between its two cells before this.
+  for (const digits of [1, 2]) {
+    const sizes = at.map((c) => layout.digitSize(c, digits));
+    check(
+      `${name}: every cell draws a ${digits}-digit number the same size`,
+      Math.max(...sizes) - Math.min(...sizes) < 1e-6
+    );
+  }
+  const glyphs = at.map((c) => layout.glyphSize(c));
+  check(
+    `${name}: every cell draws a glyph the same size`,
+    Math.max(...glyphs) - Math.min(...glyphs) < 1e-6
+  );
+
+  // And content sits at the centre of the cell's area where it can. The point
+  // of most clearance gives the biggest glyph but sits off centre in a
+  // lopsided cell, so the anchor slides toward the centroid as far as the
+  // content still fits.
+  const drift = at.map((c) => {
+    const centre = layout.center(c);
+    const middle = centroidOf(layout.polygon(c));
+    return Math.hypot(centre.x - middle.x, centre.y - middle.y);
+  });
+  check(
+    `${name}: content sits on the centre of each cell's area (worst ${Math.max(...drift).toFixed(2)}px)`,
+    Math.max(...drift) < 1.5
+  );
+}
+
+console.log("\nhand tables against what is drawn\n");
+
+// The three hand written tables and the shapes actually drawn on screen are
+// two separate descriptions of the same tiling, and nothing had been checking
+// they agreed. They can drift: turning the hexes flat-top means their offsets
+// branch on the column instead of the row, and a table left branching the old
+// way would still be symmetric, still degree six, and simply wrong about
+// which cells touch.
+//
+// So: build the polygons the layout will draw, and require two cells to be
+// neighbours exactly when their outlines share a point.
+for (const shape of allShapes) {
+  const name = shapeName(shape);
+  const topology = topologyFor(shape);
+  const layout = layoutFor(shape, 40);
+  const span = 8;
+  const patch: Coords[] = [];
+  for (let x = 0; x < span; x++) {
+    for (let y = 0; y < span; y++) {
+      patch.push(new Coords(x, y));
+    }
+  }
+  const polygons = new Map<string, Point[]>();
+  for (const c of patch) {
+    polygons.set(key(c), layout.polygon(c));
+  }
+  const share = (a: Coords, b: Coords): boolean =>
+    polygonsTouch(
+      polygons.get(key(a)) as Point[],
+      polygons.get(key(b)) as Point[]
+    );
+
+  // Only cells whose whole neighbourhood is inside the patch can be judged.
+  const inner = patch.filter(
+    (c) => c.x > 1 && c.x < span - 2 && c.y > 1 && c.y < span - 2
+  );
+  let disagreements = 0;
+  for (const c of inner) {
+    const listed = new Set(
+      topology.neighbours(c).map((n) => key(n))
+    );
+    for (const other of patch) {
+      if (key(other) === key(c)) {
+        continue;
+      }
+      if (share(c, other) !== listed.has(key(other))) {
+        disagreements++;
+      }
+    }
+  }
+  check(
+    `${name}: the neighbour table matches the outlines drawn (${inner.length} cells)`,
+    inner.length > 0 && disagreements === 0
+  );
+}
+
+console.log("\ntilings described as geometry\n");
+
+{
+  const P = (x: number, y: number): Point => ({ x, y });
+  const ROOT3 = Math.sqrt(3);
+  const h = ROOT3 / 2;
+
+  // The three shipped shapes, written the other way round: as polygons and a
+  // lattice rather than as a table of offsets. Deriving their adjacency from
+  // the geometry has to reproduce the tables that are already trusted, or the
+  // derivation has no business being pointed at a pentagon.
+  const references: { name: string; tiling: Tiling; degree: number }[] = [
+    {
+      name: "square",
+      degree: 8,
+      tiling: {
+        cells: 1,
+        across: P(1, 0),
+        down: P(0, 1),
+        unit: [[P(0, 0), P(1, 0), P(1, 1), P(0, 1)]],
+      },
+    },
+    {
+      name: "hex",
+      degree: 6,
+      tiling: {
+        cells: 1,
+        across: P(ROOT3, 0),
+        down: P(ROOT3 / 2, 1.5),
+        unit: [
+          Array.from({ length: 6 }, (_unused, k) => {
+            const angle = (Math.PI / 180) * (60 * k + 90);
+            return P(Math.cos(angle), Math.sin(angle));
+          }),
+        ],
+      },
+    },
+    {
+      name: "triangle",
+      degree: 12,
+      // The row step is half a cell across. Getting that wrong gives a
+      // tiling that still covers the plane, still has symmetric adjacency and
+      // still has the right area -- it is simply a different tiling, of
+      // degree 4. Only the known answer catches it, which is the reason these
+      // three are here.
+      tiling: {
+        cells: 2,
+        across: P(1, 0),
+        down: P(0.5, h),
+        unit: [
+          [P(0, 0), P(1, 0), P(0.5, h)],
+          [P(0.5, h), P(1.5, h), P(1, 0)],
+        ],
+      },
+    },
+  ];
+
+  for (const { name, tiling, degree } of references) {
+    const derived = deriveOffsets(tiling);
+    check(
+      `${name}: adjacency derived from geometry gives ${degree} neighbours`,
+      derived.every((row) => row.length === degree)
+    );
+  }
+
+  const named: { name: string; tiling: Tiling }[] = [
+    ...references.map((r) => ({ name: r.name, tiling: r.tiling })),
+    ...pentagonTilings,
+  ];
+
+  for (const { name, tiling } of named) {
+    const derived = deriveOffsets(tiling);
+
+    check(
+      `${name}: derived adjacency is symmetric`,
+      derived.every((row, index) =>
+        row.every((offset) =>
+          derived[offset.index].some(
+            (back) =>
+              back.index === index &&
+              back.dRow === -offset.dRow &&
+              back.dUnitColumn === -offset.dUnitColumn
+          )
+        )
       )
+    );
+
+    check(
+      `${name}: the unit fills one fundamental domain`,
+      Math.abs(
+        tiling.unit.reduce((total, polygon) => total + areaOf(polygon), 0) -
+          fundamentalArea(tiling)
+      ) < 1e-9
+    );
+
+    // Deterministic, so a red line is a real change and not an unlucky sample.
+    const coverage = checkCoverage(tiling, seeded(19), 6000);
+    check(
+      `${name}: covers the plane with no gaps and no overlaps`,
+      coverage.ok
+    );
+
+    check(
+      `${name}: every cell of the unit is convex`,
+      tiling.unit.every((polygon) => isConvex(polygon))
+    );
+
+    // Whatever a cell shows has to fit inside it, and for a pentagon that
+    // cannot be answered by a formula the way the first three were.
+    check(
+      `${name}: a two-digit number fits every cell of the unit`,
+      tiling.unit.every((polygon) => {
+        const scaled = scaleTo(polygon, 34);
+        const centre = chebyshevCenter(scaled).center;
+        const box = digitBoxEm(2);
+        return fitTextInPolygon(scaled, centre, box.width, box.height, 0) > 6;
+      })
+    );
+
+    check(
+      `${name}: an emoji and its outline fit every cell of the unit`,
+      tiling.unit.every((polygon) => {
+        const scaled = scaleTo(polygon, 34);
+        const centre = chebyshevCenter(scaled).center;
+        const box = glyphBoxEm();
+        return (
+          fitTextInPolygon(
+            scaled,
+            centre,
+            box.width,
+            box.height,
+            GLYPH_OUTLINE_PX
+          ) > 6
+        );
+      })
+    );
+  }
+
+  // Turning a tiling must not change it. Orientation is presentation, so
+  // adjacency, degree and coverage all have to come out the same -- which is
+  // what makes it safe to face each of the fifteen pentagons whichever way
+  // reads best.
+  for (const { name, tiling } of named) {
+    const before = deriveOffsets(tiling).map((row) => row.length).sort();
+    for (const [label, turn] of [
+      ["a half turn", Math.PI],
+      ["a quarter turn", Math.PI / 2],
+    ] as [string, number][]) {
+      const turned = rotateTiling(tiling, turn);
+      const after = deriveOffsets(turned).map((row) => row.length).sort();
+      check(
+        `${name}: ${label} leaves the tiling unchanged`,
+        after.join() === before.join() &&
+          checkCoverage(turned, seeded(23), 3000).ok
+      );
+    }
+  }
+
+  // The palette only runs to twelve, so a tiling that reached further would
+  // draw an undefined colour rather than a number.
+  for (const { name, tiling } of named) {
+    const worst = Math.max(...deriveOffsets(tiling).map((row) => row.length));
+    check(
+      `${name}: its ${worst} neighbours stay within the palette`,
+      typeof NUMBER_COLORS[worst] === "string"
     );
   }
 }

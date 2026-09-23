@@ -36,6 +36,29 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(16, 32, 53, Shape.triangle),
     expert: new BoardInfo(16, 60, 132, Shape.triangle),
   },
+  // Pentagons come six to a primitive unit and the unit is two hexagons wide,
+  // so a column is a third the width of a row is tall. The columns are chosen
+  // to come out roughly square on screen, and every one of them is a multiple
+  // of six because a board cannot hold part of a unit.
+  [Shape.pentagonThirds]: {
+    beginner: new BoardInfo(6, 18, 18, Shape.pentagonThirds),
+    intermediate: new BoardInfo(9, 30, 56, Shape.pentagonThirds),
+    expert: new BoardInfo(12, 42, 139, Shape.pentagonThirds),
+  },
+  // Seven neighbours, so it wants fewer mines than the six-neighbour boards
+  // for the same mean clue. Columns come in fours.
+  [Shape.pentagonHalves]: {
+    beginner: new BoardInfo(8, 20, 23, Shape.pentagonHalves),
+    intermediate: new BoardInfo(12, 28, 60, Shape.pentagonHalves),
+    expert: new BoardInfo(16, 36, 136, Shape.pentagonHalves),
+  },
+  // A row of houses is only a cell tall and a cell and a half wide, so these
+  // are wide and short in cells to come out square on screen.
+  [Shape.pentagonHouses]: {
+    beginner: new BoardInfo(4, 20, 13, Shape.pentagonHouses),
+    intermediate: new BoardInfo(6, 30, 37, Shape.pentagonHouses),
+    expert: new BoardInfo(8, 40, 88, Shape.pentagonHouses),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];

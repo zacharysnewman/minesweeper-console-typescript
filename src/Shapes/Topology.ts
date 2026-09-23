@@ -1,5 +1,7 @@
 import { Coords } from "../State/Coords";
 import { Shape } from "./Shape";
+import { hexagonHalves, hexagonThirds, houseRows } from "./pentagons";
+import { addressOf, columnOf, deriveOffsets, Tiling } from "./Tiling";
 
 // A tiling's adjacency, and nothing else.
 //
@@ -11,8 +13,12 @@ import { Shape } from "./Shape";
 // against.
 export interface Topology {
   readonly shape: Shape;
-  // How many neighbours a cell away from the edges has: 8, 6 or 12.
+  // The most neighbours any cell has: 8, 6 or 12 for the first three. Kept as
+  // the maximum rather than the count, because a tiling whose primitive unit
+  // holds several different pentagons need not give them all the same number.
   readonly degree: number;
+  // How many neighbours this particular cell has, away from the edges.
+  degreeAt(coords: Coords): number;
   // Every coordinate touching this one. Some may be off the board; Board
   // filters them, the way Mining's step() leaves bounds to its caller.
   neighbours(coords: Coords): Coords[];
@@ -34,19 +40,19 @@ const squareOffsets: Offset[] = [
 ];
 
 // --- hex: 6 -----------------------------------------------------------------
-// Odd-r offset: odd rows sit half a cell to the right, which is why the row
-// above and below shift with the parity of x. Hexes have no vertex-only
-// contact, so these six are both the edge neighbours and the whole
-// neighbourhood.
-const hexEvenRowOffsets: Offset[] = [
-  [-1, -1], [-1, 0],
-  [0, -1], [0, 1],
-  [1, -1], [1, 0],
+// Flat-top hexes in odd-q offset: odd columns sit half a cell down, which is
+// why the columns either side shift with the parity of y. Hexes have no
+// vertex-only contact, so these six are both the edge neighbours and the
+// whole neighbourhood.
+const hexEvenColumnOffsets: Offset[] = [
+  [-1, -1], [0, -1],
+  [-1, 0], [1, 0],
+  [-1, 1], [0, 1],
 ];
-const hexOddRowOffsets: Offset[] = [
-  [-1, 0], [-1, 1],
-  [0, -1], [0, 1],
-  [1, 0], [1, 1],
+const hexOddColumnOffsets: Offset[] = [
+  [0, -1], [1, -1],
+  [-1, 0], [1, 0],
+  [0, 1], [1, 1],
 ];
 
 // --- triangle: 12 -----------------------------------------------------------
@@ -76,22 +82,25 @@ export function pointsUp(coords: Coords): boolean {
 const square: Topology = {
   shape: Shape.square,
   degree: 8,
+  degreeAt: () => 8,
   neighbours: (coords) => offsetsToCoords(coords, squareOffsets),
 };
 
 const hex: Topology = {
   shape: Shape.hex,
   degree: 6,
+  degreeAt: () => 6,
   neighbours: (coords) =>
     offsetsToCoords(
       coords,
-      coords.x % 2 === 0 ? hexEvenRowOffsets : hexOddRowOffsets
+      coords.y % 2 === 0 ? hexEvenColumnOffsets : hexOddColumnOffsets
     ),
 };
 
 const triangle: Topology = {
   shape: Shape.triangle,
   degree: 12,
+  degreeAt: () => 12,
   neighbours: (coords) =>
     offsetsToCoords(
       coords,
@@ -99,10 +108,49 @@ const triangle: Topology = {
     ),
 };
 
+// A topology whose neighbour table was computed from the tiling's geometry
+// rather than written out. The derivation runs once, here, and what it
+// produces is the same kind of offset table the three above carry by hand.
+export function topologyFromTiling(shape: Shape, tiling: Tiling): Topology {
+  const offsets = deriveOffsets(tiling);
+  const degrees = offsets.map((row) => row.length);
+  return {
+    shape,
+    degree: Math.max(...degrees),
+    degreeAt: (coords) => degrees[addressOf(coords.x, coords.y, tiling).index],
+    neighbours: (coords) => {
+      const at = addressOf(coords.x, coords.y, tiling);
+      return offsets[at.index].map(
+        (o) =>
+          new Coords(
+            at.row + o.dRow,
+            columnOf(at.unitColumn + o.dUnitColumn, o.index, tiling)
+          )
+      );
+    },
+  };
+}
+
+// The tilings that are given as geometry instead of as an offset table.
+export const TILINGS: Partial<Record<Shape, Tiling>> = {
+  [Shape.pentagonThirds]: hexagonThirds,
+  [Shape.pentagonHalves]: hexagonHalves,
+  [Shape.pentagonHouses]: houseRows,
+};
+
 const topologies: Record<Shape, Topology> = {
   [Shape.square]: square,
   [Shape.hex]: hex,
   [Shape.triangle]: triangle,
+  [Shape.pentagonThirds]: topologyFromTiling(
+    Shape.pentagonThirds,
+    hexagonThirds
+  ),
+  [Shape.pentagonHalves]: topologyFromTiling(
+    Shape.pentagonHalves,
+    hexagonHalves
+  ),
+  [Shape.pentagonHouses]: topologyFromTiling(Shape.pentagonHouses, houseRows),
 };
 
 export function topologyFor(shape: Shape): Topology {
