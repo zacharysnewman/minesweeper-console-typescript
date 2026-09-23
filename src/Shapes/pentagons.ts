@@ -8,12 +8,10 @@ import { rotateTiling, Tiling } from "./Tiling";
 // rather than single shapes, so supporting a "type" means choosing one
 // instance of it.
 //
-// What the checks here can prove is that a unit is a valid tiling by congruent
-// convex pentagons -- it covers the plane, without gaps or overlaps, and its
-// adjacency is symmetric. What they cannot prove is that it is canonically
-// type N: that is a claim about published angle and edge constraints, and it
-// wants a source rather than a memory. Each entry below says which of the two
-// it is standing on.
+// These were built as constructions rather than read off the classification,
+// but they no longer have to be taken on trust: pentagonTypes.ts carries the
+// fifteen sets of conditions, and shapes:check measures each pentagon here
+// and reports which types it satisfies. All three turn out to be canonical.
 
 const P = (x: number, y: number): Point => ({ x, y });
 const ROOT3 = Math.sqrt(3);
@@ -41,7 +39,8 @@ const third = (a: number, b: number, c: number, d: number): Point[] => [
 const shift = (polygon: Point[], dx: number, dy: number): Point[] =>
   polygon.map((p) => P(p.x + dx, p.y + dy));
 
-// Hexagon thirds.
+// Hexagon thirds -- type 3, whose primitive unit the article gives as three
+// tiles, which is exactly the three pentagons of one hexagon.
 //
 // A regular hexagon divides into three congruent convex pentagons: from the
 // centre out to an edge midpoint, around two corners, and back to the next
@@ -82,7 +81,7 @@ export const hexagonThirds: Tiling = rotateTiling(
   Math.PI
 );
 
-// Hexagon halves.
+// Hexagon halves -- type 1.
 //
 // Any hexagon with a centre of symmetry, cut straight from one edge midpoint
 // to the opposite one, falls into two congruent pentagons -- the cut takes
@@ -118,7 +117,7 @@ export const hexagonHalves: Tiling = rotateTiling(
   Math.PI
 );
 
-// House rows.
+// House rows -- types 1 and 4.
 //
 // A pentagon shaped like a house, in rows, with every other one turned over
 // so its point drops into the notch between two roofs. Its two upright sides

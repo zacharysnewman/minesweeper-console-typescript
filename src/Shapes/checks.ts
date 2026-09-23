@@ -43,6 +43,7 @@ import {
   Tiling,
 } from "./Tiling";
 import { pentagonTilings } from "./pentagons";
+import { PENTAGON_TYPES, typesOf } from "./pentagonTypes";
 import { TILINGS, topologyFor } from "./Topology";
 import { layoutFor as layoutForShape } from "./geometry";
 
@@ -511,6 +512,50 @@ for (const shape of allShapes) {
       contentFitsCell(layout, coords, "glyph")
     );
   }
+}
+
+console.log("\npentagons against the classification\n");
+
+{
+  // Fifteen types of convex pentagon tile the plane and there is no
+  // sixteenth, so any pentagon here that tiles must be one of them. That
+  // makes this a real check rather than a label: a tiling that matches
+  // nothing means either the tiling is wrong or the conditions are.
+  //
+  // It has already earned it. The article's own labelling sentence reads as
+  // though side a runs out of vertex A; it runs into it, and read the wrong
+  // way every edge condition sits one place out. A tiling that plainly
+  // covered the plane then matched none of the fifteen, which is what
+  // exposed the mistake.
+  for (const { name, tiling } of pentagonTilings) {
+    const types = typesOf(tiling.unit[0]);
+    check(
+      `${name}: is one of the fifteen types [${types.join(", ") || "none"}]`,
+      types.length > 0
+    );
+    check(
+      `${name}: every cell of the unit is the same type`,
+      tiling.unit.every(
+        (cell) => typesOf(cell).join() === types.join()
+      )
+    );
+  }
+
+  // A regular pentagon does not tile, so it must match nothing. Without this
+  // the matcher could pass everything and no one would notice.
+  const regular = Array.from({ length: 5 }, (_unused, k) => {
+    const angle = (Math.PI / 180) * (90 + 72 * k);
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+  });
+  check(
+    "a regular pentagon matches none of the fifteen",
+    typesOf(regular).length === 0
+  );
+  check(
+    `all fifteen types are recorded`,
+    PENTAGON_TYPES.length === 15 &&
+      PENTAGON_TYPES.every((t, i) => t.type === i + 1)
+  );
 }
 
 console.log("\nnumbers centred and all one size\n");

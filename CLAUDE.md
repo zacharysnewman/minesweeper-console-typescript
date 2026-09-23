@@ -183,6 +183,16 @@ Four things must hold, and each catches something the others miss:
   tiles the plane perfectly well as a *different*, degree-4 tiling. The three
   shipped shapes are permanent fixtures for this reason.
 
+**A pentagon that tiles is one of fifteen types.** `pentagonTypes.ts` carries
+all fifteen sets of angle and edge conditions, so a tiling's type is measured
+rather than claimed — and since there is no sixteenth, a pentagon that tiles
+and matches *nothing* means either the tiling or the conditions are wrong.
+That is a real check, and it has already earned its place: the article's
+labelling sentence reads as though side `a` runs out of vertex A, but it runs
+*into* it (the same sentence says A is opposite d, which only holds the
+second way). Read the wrong way every edge condition sits one place out, and
+a tiling that plainly covered the plane matched none of the fifteen.
+
 **Contact is not corner-to-corner.** Most pentagon tilings are not edge to
 edge: one cell's corner lands part way along another's edge, and there no
 corners coincide at all. `polygonsTouch` asks whether a corner lies anywhere
