@@ -1,5 +1,5 @@
 import { Point } from "./geometry";
-import { Tiling } from "./Tiling";
+import { rotateTiling, Tiling } from "./Tiling";
 
 // Pentagon tilings, as geometry.
 //
@@ -56,7 +56,7 @@ const shift = (polygon: Point[], dx: number, dy: number): Point[] =>
 // every second column instead gives the basis (3, 0) and (0, sqrt(3)) -- the
 // same set of hexagons, addressed so that a rectangle of cells draws as a
 // rectangle.
-export const hexagonThirds: Tiling = {
+const hexagonThirdsUpright: Tiling = {
   cells: 6,
   across: P(3, 0),
   down: P(0, ROOT3),
@@ -69,6 +69,18 @@ export const hexagonThirds: Tiling = {
     shift(third(3, 4, 5, 5), 1.5, ROOT3 / 2),
   ],
 };
+
+// Turned half a turn, so the wide pentagon of each hexagon sits at the top
+// with its long edge horizontal rather than at the bottom. Only one of the
+// three can have a horizontal edge -- they are 120 degree rotations of each
+// other -- so this is a choice about which way that one faces, and facing up
+// reads the way the triangles do. A half turn keeps the lattice axis aligned,
+// so the board stays rectangular; a sixth or a twelfth of a turn would shear
+// it.
+export const hexagonThirds: Tiling = rotateTiling(
+  hexagonThirdsUpright,
+  Math.PI
+);
 
 export const pentagonTilings: { name: string; tiling: Tiling }[] = [
   { name: "hexagon thirds", tiling: hexagonThirds },

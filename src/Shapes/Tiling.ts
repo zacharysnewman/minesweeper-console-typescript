@@ -230,3 +230,43 @@ export function fundamentalArea(tiling: Tiling): number {
     tiling.across.x * tiling.down.y - tiling.across.y * tiling.down.x
   );
 }
+
+// The same tiling, turned.
+//
+// Orientation is a presentation choice, not a property of the tiling, and the
+// fifteen pentagons will each want a sensible one. Rotating the unit polygons
+// and the lattice vectors together keeps the tiling identical -- adjacency,
+// coverage and degree are all unchanged, which the checks confirm.
+//
+// A board stays rectangular only while the lattice stays axis aligned, so
+// quarter turns are free and anything else wants a fresh basis.
+export function rotateTiling(tiling: Tiling, radians: number): Tiling {
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const turn = (p: Point): Point => ({
+    x: p.x * cos - p.y * sin,
+    y: p.x * sin + p.y * cos,
+  });
+  let across = turn(tiling.across);
+  let down = turn(tiling.down);
+  // A quarter turn swaps which vector is the horizontal one. Put them back
+  // the way round the board expects, so rows still run across the screen.
+  if (Math.abs(across.x) < Math.abs(down.x)) {
+    const swap = across;
+    across = down;
+    down = swap;
+  }
+  // Keep both pointing the way a board grows: right, and down the screen.
+  if (across.x < 0) {
+    across = { x: -across.x, y: -across.y };
+  }
+  if (down.y < 0) {
+    down = { x: -down.x, y: -down.y };
+  }
+  return {
+    cells: tiling.cells,
+    across,
+    down,
+    unit: tiling.unit.map((polygon) => polygon.map(turn)),
+  };
+}

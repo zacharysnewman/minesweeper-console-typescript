@@ -37,6 +37,7 @@ import {
   checkCoverage,
   deriveOffsets,
   fundamentalArea,
+  rotateTiling,
   Tiling,
 } from "./Tiling";
 import { pentagonTilings } from "./pentagons";
@@ -133,8 +134,13 @@ console.log("\nadjacency properties\n");
 for (const shape of allShapes) {
   const topology = topologyFor(shape);
   const name = shapeName(shape);
-  // A patch big enough that the middle of it is nowhere near an edge.
-  const span = 12;
+  // A patch big enough that the middle of it is nowhere near an edge. A
+  // tiling's neighbours reach into the next primitive unit, so "near an edge"
+  // is measured in units and not in cells: twelve columns of a six-cell unit
+  // is two units across, and almost nothing in it is interior at all.
+  const unitCells = TILINGS[shape]?.cells ?? 1;
+  const span = 12 * unitCells;
+  const margin = 3 * unitCells;
   const cells: Coords[] = [];
   for (let x = 0; x < span; x++) {
     for (let y = 0; y < span; y++) {
@@ -175,11 +181,17 @@ for (const shape of allShapes) {
 
   // Degree counted on a real board, away from the edges, is the same number.
   const b = Board.generateNewBoard(new BoardInfo(span, span, 0, shape));
+  const interior = cells.filter(
+    (c) =>
+      c.x >= margin &&
+      c.x < span - margin &&
+      c.y >= margin &&
+      c.y < span - margin
+  );
   check(
-    `${name}: interior cells on a board keep their full degree`,
-    cells
-      .filter((c) => c.x >= 3 && c.x < span - 3 && c.y >= 3 && c.y < span - 3)
-      .every((c) => b.neighbours(c).length === topology.degreeAt(c))
+    `${name}: interior cells on a board keep their full degree (${interior.length} of them)`,
+    interior.length > 0 &&
+      interior.every((c) => b.neighbours(c).length === topology.degreeAt(c))
   );
 
   check(
@@ -634,6 +646,26 @@ console.log("\ntilings described as geometry\n");
         );
       })
     );
+  }
+
+  // Turning a tiling must not change it. Orientation is presentation, so
+  // adjacency, degree and coverage all have to come out the same -- which is
+  // what makes it safe to face each of the fifteen pentagons whichever way
+  // reads best.
+  for (const { name, tiling } of named) {
+    const before = deriveOffsets(tiling).map((row) => row.length).sort();
+    for (const [label, turn] of [
+      ["a half turn", Math.PI],
+      ["a quarter turn", Math.PI / 2],
+    ] as [string, number][]) {
+      const turned = rotateTiling(tiling, turn);
+      const after = deriveOffsets(turned).map((row) => row.length).sort();
+      check(
+        `${name}: ${label} leaves the tiling unchanged`,
+        after.join() === before.join() &&
+          checkCoverage(turned, seeded(23), 3000).ok
+      );
+    }
   }
 
   // The palette only runs to twelve, so a tiling that reached further would
