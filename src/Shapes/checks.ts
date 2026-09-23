@@ -24,12 +24,22 @@ import {
 import { ShapeGame } from "./ShapeGame";
 import { allShapes, Shape, shapeName } from "./Shape";
 import {
+  chebyshevCenter,
   digitBoxEm,
+  fitTextInPolygon,
   glyphBoxEm,
   GLYPH_OUTLINE_PX,
   layoutFor,
+  Point,
   textBoxFits,
 } from "./geometry";
+import {
+  checkCoverage,
+  deriveOffsets,
+  fundamentalArea,
+  Tiling,
+} from "./Tiling";
+import { pentagonTilings } from "./pentagons";
 import { topologyFor } from "./Topology";
 
 // The project has no test runner, so the shape rules check themselves:
@@ -48,6 +58,42 @@ function check(label: string, ok: boolean): void {
 }
 
 const key = (c: Coords): string => `${c.x},${c.y}`;
+
+function areaOf(polygon: readonly Point[]): number {
+  let total = 0;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    total += polygon[j].x * polygon[i].y - polygon[i].x * polygon[j].y;
+  }
+  return Math.abs(total) / 2;
+}
+
+function isConvex(polygon: readonly Point[]): boolean {
+  let sign = 0;
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    const c = polygon[(i + 2) % polygon.length];
+    const turn =
+      (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+    if (Math.abs(turn) < 1e-12) {
+      continue;
+    }
+    const next = Math.sign(turn);
+    if (sign === 0) {
+      sign = next;
+    } else if (next !== sign) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Scale a unit polygon so its inscribed circle is `content` across, the way a
+// board sizes its cells.
+function scaleTo(polygon: readonly Point[], content: number): Point[] {
+  const factor = content / 2 / chebyshevCenter(polygon).radius;
+  return polygon.map((p) => ({ x: p.x * factor, y: p.y * factor }));
+}
 
 // Builds a board from rows of glyphs, the way Mining/checks.ts does.
 // '#' hidden, '.' revealed, '!' flagged, '*' hidden bomb, ',' revealed bomb.
@@ -435,6 +481,155 @@ for (const shape of allShapes) {
         glyphBoxEm().height,
         GLYPH_OUTLINE_PX
       )
+    );
+  }
+}
+
+console.log("\ntilings described as geometry\n");
+
+{
+  const P = (x: number, y: number): Point => ({ x, y });
+  const ROOT3 = Math.sqrt(3);
+  const h = ROOT3 / 2;
+
+  // The three shipped shapes, written the other way round: as polygons and a
+  // lattice rather than as a table of offsets. Deriving their adjacency from
+  // the geometry has to reproduce the tables that are already trusted, or the
+  // derivation has no business being pointed at a pentagon.
+  const references: { name: string; tiling: Tiling; degree: number }[] = [
+    {
+      name: "square",
+      degree: 8,
+      tiling: {
+        cells: 1,
+        across: P(1, 0),
+        down: P(0, 1),
+        unit: [[P(0, 0), P(1, 0), P(1, 1), P(0, 1)]],
+      },
+    },
+    {
+      name: "hex",
+      degree: 6,
+      tiling: {
+        cells: 1,
+        across: P(ROOT3, 0),
+        down: P(ROOT3 / 2, 1.5),
+        unit: [
+          Array.from({ length: 6 }, (_unused, k) => {
+            const angle = (Math.PI / 180) * (60 * k + 90);
+            return P(Math.cos(angle), Math.sin(angle));
+          }),
+        ],
+      },
+    },
+    {
+      name: "triangle",
+      degree: 12,
+      // The row step is half a cell across. Getting that wrong gives a
+      // tiling that still covers the plane, still has symmetric adjacency and
+      // still has the right area -- it is simply a different tiling, of
+      // degree 4. Only the known answer catches it, which is the reason these
+      // three are here.
+      tiling: {
+        cells: 2,
+        across: P(1, 0),
+        down: P(0.5, h),
+        unit: [
+          [P(0, 0), P(1, 0), P(0.5, h)],
+          [P(0.5, h), P(1.5, h), P(1, 0)],
+        ],
+      },
+    },
+  ];
+
+  for (const { name, tiling, degree } of references) {
+    const derived = deriveOffsets(tiling);
+    check(
+      `${name}: adjacency derived from geometry gives ${degree} neighbours`,
+      derived.every((row) => row.length === degree)
+    );
+  }
+
+  const named: { name: string; tiling: Tiling }[] = [
+    ...references.map((r) => ({ name: r.name, tiling: r.tiling })),
+    ...pentagonTilings,
+  ];
+
+  for (const { name, tiling } of named) {
+    const derived = deriveOffsets(tiling);
+
+    check(
+      `${name}: derived adjacency is symmetric`,
+      derived.every((row, index) =>
+        row.every((offset) =>
+          derived[offset.index].some(
+            (back) =>
+              back.index === index &&
+              back.dRow === -offset.dRow &&
+              back.dUnitColumn === -offset.dUnitColumn
+          )
+        )
+      )
+    );
+
+    check(
+      `${name}: the unit fills one fundamental domain`,
+      Math.abs(
+        tiling.unit.reduce((total, polygon) => total + areaOf(polygon), 0) -
+          fundamentalArea(tiling)
+      ) < 1e-9
+    );
+
+    // Deterministic, so a red line is a real change and not an unlucky sample.
+    const coverage = checkCoverage(tiling, seeded(19), 6000);
+    check(
+      `${name}: covers the plane with no gaps and no overlaps`,
+      coverage.ok
+    );
+
+    check(
+      `${name}: every cell of the unit is convex`,
+      tiling.unit.every((polygon) => isConvex(polygon))
+    );
+
+    // Whatever a cell shows has to fit inside it, and for a pentagon that
+    // cannot be answered by a formula the way the first three were.
+    check(
+      `${name}: a two-digit number fits every cell of the unit`,
+      tiling.unit.every((polygon) => {
+        const scaled = scaleTo(polygon, 34);
+        const centre = chebyshevCenter(scaled).center;
+        const box = digitBoxEm(2);
+        return fitTextInPolygon(scaled, centre, box.width, box.height, 0) > 6;
+      })
+    );
+
+    check(
+      `${name}: an emoji and its outline fit every cell of the unit`,
+      tiling.unit.every((polygon) => {
+        const scaled = scaleTo(polygon, 34);
+        const centre = chebyshevCenter(scaled).center;
+        const box = glyphBoxEm();
+        return (
+          fitTextInPolygon(
+            scaled,
+            centre,
+            box.width,
+            box.height,
+            GLYPH_OUTLINE_PX
+          ) > 6
+        );
+      })
+    );
+  }
+
+  // The palette only runs to twelve, so a tiling that reached further would
+  // draw an undefined colour rather than a number.
+  for (const { name, tiling } of named) {
+    const worst = Math.max(...deriveOffsets(tiling).map((row) => row.length));
+    check(
+      `${name}: its ${worst} neighbours stay within the palette`,
+      typeof NUMBER_COLORS[worst] === "string"
     );
   }
 }

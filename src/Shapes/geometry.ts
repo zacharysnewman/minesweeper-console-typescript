@@ -182,7 +182,7 @@ const EMOJI_HEIGHT_EM = 1.18;
 
 // Room to breathe. The geometry above says where a glyph would just touch the
 // outline; a cell that reads well keeps it well short of that.
-const FILL = 0.82;
+export const FILL = 0.82;
 
 // The largest font size at which a text box of widthEm x heightEm, centred on
 // the cell's content centre, stays inside the outline.
@@ -283,4 +283,145 @@ function inside(point: Point, polygon: Point[]): boolean {
     }
   }
   return hit;
+}
+
+// --- fitting content into an arbitrary convex cell ---------------------------
+//
+// The three original shapes each got a closed form: a square and a hex are at
+// full width across the middle, a triangle closes toward its apex. There is no
+// closed form for the fifteen pentagons, and several of them are lopsided
+// enough that guessing would slice glyphs the way the inscribed circle did on
+// triangles. So this works for any convex polygon, and the special cases stay
+// only because they are already proven.
+
+// The point furthest from every edge, and how far that is: the centre of the
+// largest circle that fits. For a triangle this is the incentre, which is why
+// an up-pointing cell's glyph rides low.
+export function chebyshevCenter(polygon: readonly Point[]): {
+  center: Point;
+  radius: number;
+} {
+  const xs = polygon.map((p) => p.x);
+  const ys = polygon.map((p) => p.y);
+  let lo: Point = { x: Math.min(...xs), y: Math.min(...ys) };
+  let hi: Point = { x: Math.max(...xs), y: Math.max(...ys) };
+
+  let best: Point = { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+  let bestRadius = -Infinity;
+
+  // Coarse grid, then tighten around the winner. Cheap, and the polygons are
+  // small and few -- this runs once per shape, not once per cell drawn.
+  for (let pass = 0; pass < 24; pass++) {
+    const steps = 12;
+    for (let i = 0; i <= steps; i++) {
+      for (let j = 0; j <= steps; j++) {
+        const p: Point = {
+          x: lo.x + ((hi.x - lo.x) * i) / steps,
+          y: lo.y + ((hi.y - lo.y) * j) / steps,
+        };
+        const r = distanceToEdges(p, polygon);
+        if (r > bestRadius) {
+          bestRadius = r;
+          best = p;
+        }
+      }
+    }
+    const spanX = (hi.x - lo.x) / 4;
+    const spanY = (hi.y - lo.y) / 4;
+    lo = { x: best.x - spanX, y: best.y - spanY };
+    hi = { x: best.x + spanX, y: best.y + spanY };
+  }
+  return { center: best, radius: Math.max(0, bestRadius) };
+}
+
+// Twice the signed area: positive when the polygon is wound counter-clockwise.
+function signedArea(polygon: readonly Point[]): number {
+  let total = 0;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    total += polygon[j].x * polygon[i].y - polygon[i].x * polygon[j].y;
+  }
+  return total;
+}
+
+// Distance from an interior point to the nearest edge, negative when outside.
+//
+// Which side of an edge is "in" depends on the winding, so the winding is
+// measured rather than assumed. Assuming it cost two failing checks here: the
+// down-pointing triangle of the triangle tiling is wound the opposite way to
+// the up-pointing one, so every point in it read as outside and it fit
+// nothing at all. Fifteen hand-entered pentagon units are not going to be
+// consistently wound either.
+function distanceToEdges(point: Point, polygon: readonly Point[]): number {
+  const orientation = signedArea(polygon) >= 0 ? 1 : -1;
+  let nearest = Infinity;
+  let inside = true;
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i];
+    const b = polygon[(i + 1) % polygon.length];
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const length = Math.hypot(ex, ey);
+    if (length === 0) {
+      continue;
+    }
+    const cross =
+      (orientation * (ex * (point.y - a.y) - ey * (point.x - a.x))) / length;
+    if (cross < 0) {
+      inside = false;
+    }
+    nearest = Math.min(nearest, Math.abs(cross));
+  }
+  return inside ? nearest : -nearest;
+}
+
+export function pointInPolygon(
+  point: Point,
+  polygon: readonly Point[]
+): boolean {
+  let hit = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i];
+    const b = polygon[j];
+    if (
+      a.y > point.y !== b.y > point.y &&
+      point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x
+    ) {
+      hit = !hit;
+    }
+  }
+  return hit;
+}
+
+// The largest font size at which a text box of widthEm x heightEm, centred on
+// the cell's content centre, keeps all four corners inside the outline.
+// Binary search rather than algebra, because the outline is arbitrary.
+export function fitTextInPolygon(
+  polygon: readonly Point[],
+  centre: Point,
+  widthEm: number,
+  heightEm: number,
+  inset = 0
+): number {
+  const fits = (size: number): boolean => {
+    const halfWidth = (widthEm * size) / 2 + inset;
+    const halfHeight = (heightEm * size) / 2 + inset;
+    return [
+      { x: centre.x - halfWidth, y: centre.y - halfHeight },
+      { x: centre.x + halfWidth, y: centre.y - halfHeight },
+      { x: centre.x + halfWidth, y: centre.y + halfHeight },
+      { x: centre.x - halfWidth, y: centre.y + halfHeight },
+    ].every((corner) => pointInPolygon(corner, polygon));
+  };
+
+  let lo = 0;
+  let hi = 4 * chebyshevCenter(polygon).radius + 1;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return FILL * lo;
 }
