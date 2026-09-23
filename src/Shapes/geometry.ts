@@ -66,6 +66,23 @@ export interface FittedSizes {
   glyphSize(coords: Coords): number;
 }
 
+// Every cell of a board shows its number at the same size.
+//
+// Cells of one unit are usually congruent, but a horizontal box does not fit
+// a turned copy the same way -- the thirds of a hexagon are 120 degrees apart
+// and differ by a couple of percent. That is real geometry rather than a
+// fault, and it still reads as numbers of slightly different sizes, so the
+// tightest cell sets the size for all of them.
+function normalise(
+  sizes: { digits: number[]; glyph: number }[]
+): { digits: number[]; glyph: number }[] {
+  const digits = sizes[0].digits.map((_unused, i) =>
+    Math.min(...sizes.map((s) => s.digits[i]))
+  );
+  const glyph = Math.min(...sizes.map((s) => s.glyph));
+  return sizes.map(() => ({ digits, glyph }));
+}
+
 export function fittedSizes(
   layout: Layout,
   variants: Coords[],
@@ -92,7 +109,7 @@ export function fittedSizes(
     });
   const ready = (): { digits: number[]; glyph: number }[] => {
     if (cache === null) {
-      cache = build();
+      cache = normalise(build());
     }
     return cache;
   };
@@ -299,20 +316,41 @@ export function tilingLayout(
     maxX: Math.max(...polygon.map((p) => p.x)),
     maxY: Math.max(...polygon.map((p) => p.y)),
   }));
-  const digitSizes = unit.map((polygon, i) =>
-    [1, 2, 3].map((digits) => {
-      const box = digitBoxEm(digits);
-      return fitTextInPolygon(polygon, centres[i], box.width, box.height, 0);
-    })
+  const fitted = normalise(
+    unit.map((polygon, i) => ({
+      digits: [1, 2, 3].map((digits) => {
+        const box = digitBoxEm(digits);
+        return fitTextInPolygon(polygon, centres[i], box.width, box.height, 0);
+      }),
+      glyph: fitTextInPolygon(
+        polygon,
+        centres[i],
+        glyphBoxEm().width,
+        glyphBoxEm().height,
+        GLYPH_OUTLINE_PX
+      ),
+    }))
   );
-  const glyphSizes = unit.map((polygon, i) =>
-    fitTextInPolygon(
-      polygon,
-      centres[i],
-      glyphBoxEm().width,
-      glyphBoxEm().height,
-      GLYPH_OUTLINE_PX
-    )
+  const digitSizes = fitted.map((f) => f.digits);
+  const glyphSizes = fitted.map((f) => f.glyph);
+
+  // Now the sizes are settled, move each anchor as close to the centre of its
+  // area as the content allows.
+  const anchors = unit.map((polygon, i) =>
+    centredAnchor(polygon, [
+      ...digitSizes[i].map((size, d) => ({
+        widthEm: digitBoxEm(d + 1).width,
+        heightEm: digitBoxEm(d + 1).height,
+        size,
+        inset: 0,
+      })),
+      {
+        widthEm: glyphBoxEm().width,
+        heightEm: glyphBoxEm().height,
+        size: glyphSizes[i],
+        inset: GLYPH_OUTLINE_PX,
+      },
+    ])
   );
 
   const offsetOf = (coords: Coords): Point => {
@@ -360,7 +398,7 @@ export function tilingLayout(
     },
     center: (coords) => {
       const o = offsetOf(coords);
-      const c = centres[indexOf(coords)];
+      const c = anchors[indexOf(coords)];
       return { x: c.x + o.x, y: c.y + o.y };
     },
     digitSize: (coords, digits) =>
@@ -466,13 +504,38 @@ function inside(point: Point, polygon: Point[]): boolean {
 // triangles. So this works for any convex polygon, and the special cases stay
 // only because they are already proven.
 
+// The centroid: the average of the polygon's area, used only to break ties.
+export function centroidOf(polygon: readonly Point[]): Point {
+  let twiceArea = 0;
+  let x = 0;
+  let y = 0;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const cross = polygon[j].x * polygon[i].y - polygon[i].x * polygon[j].y;
+    twiceArea += cross;
+    x += (polygon[j].x + polygon[i].x) * cross;
+    y += (polygon[j].y + polygon[i].y) * cross;
+  }
+  return { x: x / (3 * twiceArea), y: y / (3 * twiceArea) };
+}
+
 // The point furthest from every edge, and how far that is: the centre of the
 // largest circle that fits. For a triangle this is the incentre, which is why
 // an up-pointing cell's glyph rides low.
+//
+// That point is not always unique. A house-shaped pentagon's largest circle
+// slides up and down inside the body without ever getting bigger, so there is
+// a whole segment of equally good answers and a search will return whichever
+// one it happened to land on -- a different one for a cell that has been
+// turned over, which is how two congruent cells ended up with font sizes 23%
+// apart. Ties therefore go to the point nearest the centroid, which is both
+// canonical and the one that looks centred.
 export function chebyshevCenter(polygon: readonly Point[]): {
   center: Point;
   radius: number;
 } {
+  const middle = centroidOf(polygon);
+  // Small enough to decide nothing but a tie.
+  const TIE = 1e-6;
   const xs = polygon.map((p) => p.x);
   const ys = polygon.map((p) => p.y);
   let lo: Point = { x: Math.min(...xs), y: Math.min(...ys) };
@@ -491,7 +554,9 @@ export function chebyshevCenter(polygon: readonly Point[]): {
           x: lo.x + ((hi.x - lo.x) * i) / steps,
           y: lo.y + ((hi.y - lo.y) * j) / steps,
         };
-        const r = distanceToEdges(p, polygon);
+        const r =
+          distanceToEdges(p, polygon) -
+          TIE * Math.hypot(p.x - middle.x, p.y - middle.y);
         if (r > bestRadius) {
           bestRadius = r;
           best = p;
@@ -503,7 +568,7 @@ export function chebyshevCenter(polygon: readonly Point[]): {
     lo = { x: best.x - spanX, y: best.y - spanY };
     hi = { x: best.x + spanX, y: best.y + spanY };
   }
-  return { center: best, radius: Math.max(0, bestRadius) };
+  return { center: best, radius: Math.max(0, distanceToEdges(best, polygon)) };
 }
 
 // Twice the signed area: positive when the polygon is wound counter-clockwise.
@@ -544,6 +609,62 @@ function distanceToEdges(point: Point, polygon: readonly Point[]): number {
     nearest = Math.min(nearest, Math.abs(cross));
   }
   return inside ? nearest : -nearest;
+}
+
+// Where content actually sits.
+//
+// The point of most clearance gives the biggest glyph, but in a lopsided cell
+// it is not where the eye expects the middle to be -- a hexagon cut in half
+// puts it some way off the centre of the area. Anchoring on the centroid
+// instead looks right and costs up to 16% of the size.
+//
+// So take the size from the clearest point, then slide toward the centroid as
+// far as the content still fits. Both, rather than a choice between them.
+export interface ContentBox {
+  readonly widthEm: number;
+  readonly heightEm: number;
+  readonly size: number;
+  readonly inset: number;
+}
+
+export function centredAnchor(
+  polygon: readonly Point[],
+  boxes: ContentBox[]
+): Point {
+  const start = chebyshevCenter(polygon).center;
+  const target = centroidOf(polygon);
+  const fits = (at: Point): boolean =>
+    boxes.every((box) => {
+      const halfWidth = (box.widthEm * box.size) / 2 + box.inset;
+      const halfHeight = (box.heightEm * box.size) / 2 + box.inset;
+      return [
+        { x: at.x - halfWidth, y: at.y - halfHeight },
+        { x: at.x + halfWidth, y: at.y - halfHeight },
+        { x: at.x + halfWidth, y: at.y + halfHeight },
+        { x: at.x - halfWidth, y: at.y + halfHeight },
+      ].every((corner) => pointInPolygon(corner, polygon));
+    });
+  if (!fits(start)) {
+    return start;
+  }
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    const at = {
+      x: start.x + (target.x - start.x) * mid,
+      y: start.y + (target.y - start.y) * mid,
+    };
+    if (fits(at)) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return {
+    x: start.x + (target.x - start.x) * lo,
+    y: start.y + (target.y - start.y) * lo,
+  };
 }
 
 export function pointInPolygon(

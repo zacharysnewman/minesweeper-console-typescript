@@ -32,6 +32,7 @@ import {
   layoutFor,
   Point,
   contentFitsCell,
+  centroidOf,
 } from "./geometry";
 import {
   checkCoverage,
@@ -510,6 +511,46 @@ for (const shape of allShapes) {
       contentFitsCell(layout, coords, "glyph")
     );
   }
+}
+
+console.log("\nnumbers centred and all one size\n");
+
+for (const shape of allShapes) {
+  const name = shapeName(shape);
+  const layout = layoutFor(shape, 34);
+  const cells = TILINGS[shape]?.cells ?? 2;
+  const at = Array.from({ length: cells }, (_unused, i) => new Coords(0, i));
+
+  // Cells of one unit are usually congruent, but a horizontal box does not
+  // fit a turned copy the same way, so the sizes have to be levelled or the
+  // board shows numbers of visibly different sizes. A house-shaped pentagon
+  // was 23% apart between its two cells before this.
+  for (const digits of [1, 2]) {
+    const sizes = at.map((c) => layout.digitSize(c, digits));
+    check(
+      `${name}: every cell draws a ${digits}-digit number the same size`,
+      Math.max(...sizes) - Math.min(...sizes) < 1e-6
+    );
+  }
+  const glyphs = at.map((c) => layout.glyphSize(c));
+  check(
+    `${name}: every cell draws a glyph the same size`,
+    Math.max(...glyphs) - Math.min(...glyphs) < 1e-6
+  );
+
+  // And content sits at the centre of the cell's area where it can. The point
+  // of most clearance gives the biggest glyph but sits off centre in a
+  // lopsided cell, so the anchor slides toward the centroid as far as the
+  // content still fits.
+  const drift = at.map((c) => {
+    const centre = layout.center(c);
+    const middle = centroidOf(layout.polygon(c));
+    return Math.hypot(centre.x - middle.x, centre.y - middle.y);
+  });
+  check(
+    `${name}: content sits on the centre of each cell's area (worst ${Math.max(...drift).toFixed(2)}px)`,
+    Math.max(...drift) < 1.5
+  );
 }
 
 console.log("\nhand tables against what is drawn\n");

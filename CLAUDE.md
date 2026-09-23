@@ -399,6 +399,21 @@ it reproduced all three hand formulas before replacing them. Computed once
 per distinct cell shape, and asked of the **cell**, since a primitive unit
 need not be uniform.
 
+**One size per board, centred on the cell's area.** Cells of a unit are
+usually congruent, but a *horizontal* box does not fit a turned copy the same
+way, so the tightest cell sets the size for all of them — a house-shaped
+pentagon was 23% apart between its two cells before that. And the point of
+most clearance, which is what gives the biggest glyph, sits off centre in a
+lopsided cell: `centredAnchor` takes the size from that point and then slides
+toward the centroid as far as the content still fits, which so far reaches the
+centroid every time at no cost in size.
+
+Watch for a **non-unique** Chebyshev centre. A house's largest circle slides
+up and down inside the body without ever growing, so there is a segment of
+equally good answers and a search returns whichever it landed on — a
+different one for a cell that has been turned over. Ties go to the point
+nearest the centroid, which is both canonical and what looks centred.
+
 **Never hardcode a font metric without measuring it.** Two shipped wrong: the
 numbers are drawn bold, which advances 0.696em per digit rather than the
 0.636em of the regular weight, and Noto's emoji are 1.25em wide rather than
