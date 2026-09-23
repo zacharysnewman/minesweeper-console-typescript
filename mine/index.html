@@ -61,6 +61,59 @@
       >.
     </footer>
 
+    <!--
+      The module is hashed, so it can never be stale. index.html is not, and
+      a browser holding an old copy of this file asks for a script hash that
+      no longer exists -- which renders as a styled page with no board and no
+      explanation. This watchdog is plain, non-module script so it runs even
+      when the module does not, and it says what happened.
+    -->
+    <script>
+      (function () {
+        function show(text) {
+          if (window.pageBooted) return;
+          var status = document.getElementById("status");
+          if (!status || status.dataset.bootFailed) return;
+          status.dataset.bootFailed = "1";
+          status.textContent = text;
+          var again = document.createElement("button");
+          again.type = "button";
+          again.textContent = "Reload";
+          again.style.marginInlineStart = "8px";
+          again.addEventListener("click", function () {
+            // A fresh query string, so the retry cannot be answered from
+            // whatever cached or half-deployed copy caused this.
+            location.replace(location.pathname + "?v=" + Date.now());
+          });
+          status.appendChild(again);
+        }
+        window.addEventListener(
+          "error",
+          function (event) {
+            var target = event.target;
+            if (target && target.tagName === "SCRIPT") {
+              // The file never arrived: a 404, a blocked request, or an
+              // index.html pointing at a build that is no longer there.
+              var src = String(target.src || "").split("/").pop();
+              show("Could not load the script (" + src + ").");
+              return;
+            }
+            // It arrived and threw. An error while the modules are still
+            // being evaluated lands here rather than in the page's own
+            // try/catch, which has not started yet.
+            if (event.message) {
+              show("The script failed: " + event.message);
+            }
+          },
+          true
+        );
+        window.addEventListener("load", function () {
+          setTimeout(function () {
+            show("The script loaded but never ran.");
+          }, 2500);
+        });
+      })();
+    </script>
     <script type="module" src="/src/web/mine.ts"></script>
   </body>
 </html>

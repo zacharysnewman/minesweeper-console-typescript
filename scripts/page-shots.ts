@@ -163,6 +163,43 @@ async function main(): Promise<void> {
   const page = await context.newPage();
 
   const problems: string[] = [];
+
+  // Every page, not just this one. All three share a chunk, so one missing
+  // script takes the whole site down, and a script that never runs leaves a
+  // styled page that looks like a layout bug rather than a missing file.
+  for (const [name, at, cell] of [
+    ["classic", "", ".tile"],
+    ["mining", "mine/", ".tile"],
+    ["shapes", "shapes/", ".shape-cell"],
+  ] as [string, string, string][]) {
+    await page.goto(`${site.url}${at}`);
+    await page.waitForTimeout(400);
+    const boot = await page.evaluate(
+      (sel) => ({
+        booted:
+          (window as unknown as { pageBooted?: boolean }).pageBooted === true,
+        cells: document.querySelectorAll(sel).length,
+        status: document.getElementById("status")?.textContent ?? "",
+      }),
+      cell
+    );
+    if (!boot.booted) {
+      problems.push(`${name}: did not boot (status: "${boot.status}")`);
+    }
+    if (boot.cells === 0) {
+      problems.push(`${name}: rendered no cells`);
+    }
+  }
+
+  await page.goto(`${site.url}shapes/`);
+  await page.waitForTimeout(300);
+  const faceGlyph = await page.evaluate(
+    () => document.getElementById("face")?.textContent ?? ""
+  );
+  if (faceGlyph === "") {
+    problems.push("shapes: the face button is empty");
+  }
+
   for (const shape of ["square", "hex", "triangle"]) {
     for (const size of ["beginner", "expert"]) {
       problems.push(...(await shoot(page, site.url, shape, size)));

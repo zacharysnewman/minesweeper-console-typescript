@@ -64,8 +64,13 @@ export const GLYPH_OUTLINE_COLOR = "#241f1c";
 // a filter repeated in nine hundred inline svgs would be nine hundred copies.
 export function glyphOutlineDefs(): string {
   return (
-    `<svg width="0" height="0" aria-hidden="true" focusable="false" ` +
-    `style="position:absolute" xmlns="http://www.w3.org/2000/svg"><defs>` +
+    // Positioned out of the way rather than hidden: Safari drops a filter
+    // whose defining svg is display:none, and the glyphs referencing it then
+    // render as nothing at all.
+    `<svg width="1" height="1" aria-hidden="true" focusable="false" ` +
+    `style="position:absolute;width:1px;height:1px;overflow:hidden;` +
+    `clip-path:inset(50%);pointer-events:none" ` +
+    `xmlns="http://www.w3.org/2000/svg"><defs>` +
     `<filter id="${GLYPH_OUTLINE_ID}" x="-35%" y="-35%" width="170%" height="170%">` +
     `<feMorphology in="SourceAlpha" operator="dilate" ` +
     `radius="${GLYPH_OUTLINE_PX}" result="thick" />` +
