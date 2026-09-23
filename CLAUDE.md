@@ -193,6 +193,17 @@ labelling sentence reads as though side `a` runs out of vertex A, but it runs
 second way). Read the wrong way every edge condition sits one place out, and
 a tiling that plainly covered the plane matched none of the fifteen.
 
+**Type 1 has a general construction.** A pentagon with two adjacent angles
+summing to 180° — which is exactly the type 1 condition — pairs with its own
+half turn about the edge between them into a hexagon with a centre of
+symmetry: the two angles make a straight line at each end, so eight corners
+become six. Every centrally symmetric hexagon tiles by translation, so
+`pairedPentagonTiling` turns any type 1 pentagon into a board with no
+arrangement to look up. `squareUp` then puts the lattice on the axes, since
+the natural basis leans and a leaning basis draws a long diagonal in a mostly
+empty box; where the residual drift is a simple fraction of a step, stacking
+that many rows into the unit cancels it exactly.
+
 **Contact is not corner-to-corner.** Most pentagon tilings are not edge to
 edge: one cell's corner lands part way along another's edge, and there no
 corners coincide at all. `polygonsTouch` asks whether a corner lies anywhere

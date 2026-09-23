@@ -28,6 +28,7 @@ const SHAPES: Record<string, Shape> = {
   pentagonThirds: Shape.pentagonThirds,
   pentagonHalves: Shape.pentagonHalves,
   pentagonHouses: Shape.pentagonHouses,
+  pentagonSlab: Shape.pentagonSlab,
 };
 
 // A triangle advances half a cell per column, so it needs a bigger cell to
@@ -39,6 +40,7 @@ const PREFERRED_CELL: Record<Shape, number> = {
   [Shape.pentagonThirds]: 30,
   [Shape.pentagonHalves]: 30,
   [Shape.pentagonHouses]: 30,
+  [Shape.pentagonSlab]: 30,
 };
 
 // Below this a board stops being readable, and scrolling is the better answer

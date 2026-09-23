@@ -302,3 +302,117 @@ export function rotateTiling(tiling: Tiling, radians: number): Tiling {
     unit: tiling.unit.map((polygon) => polygon.map(turn)),
   };
 }
+
+// Turn a tiling so its lattice runs along the axes, if it can be.
+//
+// A board is a rectangle of cells, so it only draws as a rectangle while the
+// lattice is axis aligned. Most constructions do not come out that way: the
+// natural basis leans, and a leaning basis draws a long diagonal in a mostly
+// empty bounding box.
+//
+// Two moves fix it. Turning the whole tiling puts `across` on the horizontal.
+// Then `down` still has some sideways drift, and subtracting whole steps of
+// `across` reduces it to less than half a step -- but not to nothing. If that
+// residue is a simple fraction of `across`, stacking that many rows into the
+// primitive unit cancels it exactly, which is the same trick that squared up
+// the hexagons.
+export function squareUp(tiling: Tiling, maxRows = 8): Tiling {
+  const turned = rotateTiling(
+    tiling,
+    -Math.atan2(tiling.across.y, tiling.across.x)
+  );
+  const width = turned.across.x;
+  if (Math.abs(width) < 1e-9) {
+    return turned;
+  }
+  // Reduce the sideways drift to less than half a step.
+  const steps = Math.round(turned.down.x / width);
+  const down: Point = {
+    x: turned.down.x - steps * width,
+    y: turned.down.y - steps * turned.across.y,
+  };
+  const shifted: Tiling = { ...turned, down };
+  if (Math.abs(down.x) < 1e-9) {
+    return shifted;
+  }
+
+  // How many rows it takes for the drift to come back to a whole step.
+  const drift = down.x / width;
+  let rows = 0;
+  for (let q = 2; q <= maxRows; q++) {
+    if (Math.abs(q * drift - Math.round(q * drift)) < 1e-9) {
+      rows = q;
+      break;
+    }
+  }
+  if (rows === 0) {
+    // Nothing small enough; the board will lean.
+    return shifted;
+  }
+
+  const unit: Point[][] = [];
+  for (let r = 0; r < rows; r++) {
+    const back = Math.round(r * drift);
+    for (const polygon of shifted.unit) {
+      unit.push(
+        polygon.map((p) => ({
+          x: p.x + r * down.x - back * width,
+          y: p.y + r * down.y - back * shifted.across.y,
+        }))
+      );
+    }
+  }
+  return {
+    cells: shifted.cells * rows,
+    across: shifted.across,
+    down: { x: 0, y: rows * down.y },
+    unit,
+  };
+}
+
+// A pentagon with two adjacent angles summing to 180 degrees, turned half a
+// turn about the edge between them, joins its copy into a hexagon with a
+// centre of symmetry -- the two angles make a straight line at each end, so
+// eight corners become six. Every centrally symmetric hexagon tiles by
+// translation, which makes this a tiling for any pentagon of type 1.
+export function pairedPentagonTiling(pentagon: Point[]): Tiling | undefined {
+  const interior = (i: number): number => {
+    const v = pentagon;
+    const prev = v[(i + 4) % 5];
+    const next = v[(i + 1) % 5];
+    const u = Math.atan2(prev.y - v[i].y, prev.x - v[i].x);
+    const w = Math.atan2(next.y - v[i].y, next.x - v[i].x);
+    let turn = ((u - w) * 180) / Math.PI;
+    while (turn < 0) turn += 360;
+    while (turn > 360) turn -= 360;
+    return turn > 180 ? 360 - turn : turn;
+  };
+
+  for (let i = 0; i < 5; i++) {
+    const j = (i + 1) % 5;
+    if (Math.abs(interior(i) + interior(j) - 180) > 1e-6) {
+      continue;
+    }
+    const mx = (pentagon[i].x + pentagon[j].x) / 2;
+    const my = (pentagon[i].y + pentagon[j].y) / 2;
+    const other = pentagon.map((p) => ({ x: 2 * mx - p.x, y: 2 * my - p.y }));
+    // The hexagon's corners: everything except the shared edge's ends, which
+    // are now straight lines rather than corners.
+    const hex = [
+      pentagon[(i + 2) % 5], pentagon[(i + 3) % 5], pentagon[(i + 4) % 5],
+      other[(i + 2) % 5], other[(i + 3) % 5], other[(i + 4) % 5],
+    ];
+    const edge = (k: number): Point => ({
+      x: hex[(k + 1) % 6].x - hex[k].x,
+      y: hex[(k + 1) % 6].y - hex[k].y,
+    });
+    const e0 = edge(0), e1 = edge(1), e2 = edge(2);
+    return squareUp({
+      cells: 2,
+      across: { x: e0.x + e1.x, y: e0.y + e1.y },
+      down: { x: e1.x + e2.x, y: e1.y + e2.y },
+      unit: [pentagon, other],
+    });
+  }
+  return undefined;
+}

@@ -59,6 +59,13 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(6, 30, 37, Shape.pentagonHouses),
     expert: new BoardInfo(8, 40, 88, Shape.pentagonHouses),
   },
+  // A slab is one unit wide and eight tall, so these run very wide in cells
+  // to come out square on screen. Seven neighbours, columns in fours.
+  [Shape.pentagonSlab]: {
+    beginner: new BoardInfo(6, 48, 41, Shape.pentagonSlab),
+    intermediate: new BoardInfo(8, 64, 91, Shape.pentagonSlab),
+    expert: new BoardInfo(10, 80, 189, Shape.pentagonSlab),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];

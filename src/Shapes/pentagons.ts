@@ -1,5 +1,5 @@
 import { Point } from "./geometry";
-import { rotateTiling, Tiling } from "./Tiling";
+import { pairedPentagonTiling, rotateTiling, Tiling } from "./Tiling";
 
 // Pentagon tilings, as geometry.
 //
@@ -139,8 +139,24 @@ export const houseRows: Tiling = {
   ],
 };
 
+// A peaked slab -- type 1, and built by the general route rather than by
+// hand: any pentagon with two adjacent angles summing to 180 pairs with its
+// own half turn into a centrally symmetric hexagon, and those always tile.
+// This one's 90 and 90 at the base do it.
+//
+// Seven neighbours, and four cells to a unit once the lattice has been
+// squared up, since the natural one leans by half a step per row.
+export const pairedSlab: Tiling = pairedPentagonTiling([
+  P(0, 0),
+  P(4, 0),
+  P(4, 1),
+  P(2, 3),
+  P(0, 1),
+]) as Tiling;
+
 export const pentagonTilings: { name: string; tiling: Tiling }[] = [
   { name: "hexagon thirds", tiling: hexagonThirds },
   { name: "hexagon halves", tiling: hexagonHalves },
   { name: "house rows", tiling: houseRows },
+  { name: "paired slab", tiling: pairedSlab },
 ];
