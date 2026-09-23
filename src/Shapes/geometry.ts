@@ -49,9 +49,71 @@ export interface Layout {
 
 const ROOT3 = Math.sqrt(3);
 
+// How big content may be drawn, worked out from the outline itself.
+//
+// Every shape used to carry its own formula for this. That worked while there
+// were three of them and each could be derived by hand, but a formula with a
+// case per shape also has a fallback, and a shape that quietly takes another
+// shape's fallback renders without complaining -- which is exactly what a
+// pentagon did. The general fit is measured against the polygon instead, and
+// it reproduced all three hand formulas before replacing them.
+//
+// Computed once per distinct cell shape and then reused: a square board has
+// one, a triangle board has two, and the cost is paid when a board is built
+// rather than per cell drawn.
+export interface FittedSizes {
+  digitSize(coords: Coords, digits: number): number;
+  glyphSize(coords: Coords): number;
+}
+
+export function fittedSizes(
+  layout: Layout,
+  variants: Coords[],
+  which: (coords: Coords) => number = () => 0
+): FittedSizes {
+  let cache: { digits: number[]; glyph: number }[] | null = null;
+  const build = (): { digits: number[]; glyph: number }[] =>
+    variants.map((at) => {
+      const polygon = layout.polygon(at);
+      const centre = layout.center(at);
+      return {
+        digits: [1, 2, 3].map((digits) => {
+          const box = digitBoxEm(digits);
+          return fitTextInPolygon(polygon, centre, box.width, box.height, 0);
+        }),
+        glyph: fitTextInPolygon(
+          polygon,
+          centre,
+          glyphBoxEm().width,
+          glyphBoxEm().height,
+          GLYPH_OUTLINE_PX
+        ),
+      };
+    });
+  const ready = (): { digits: number[]; glyph: number }[] => {
+    if (cache === null) {
+      cache = build();
+    }
+    return cache;
+  };
+  return {
+    digitSize: (coords, digits) =>
+      ready()[which(coords)].digits[Math.min(Math.max(digits, 1), 3) - 1],
+    glyphSize: (coords) => ready()[which(coords)].glyph,
+  };
+}
+
+
 function squareLayout(content: number): Layout {
   const s = content;
   const origin = (c: Coords): Point => ({ x: c.y * s, y: c.x * s });
+  let fitted: FittedSizes | null = null;
+  const sizes = (): FittedSizes => {
+    if (fitted === null) {
+      fitted = fittedSizes(layout, [new Coords(0, 0)]);
+    }
+    return fitted;
+  };
   const layout: Layout = {
     shape: Shape.square,
     content,
@@ -73,53 +135,58 @@ function squareLayout(content: number): Layout {
       const o = origin(c);
       return { x: o.x + s / 2, y: o.y + s / 2 };
     },
-    // The closed forms answer the same for every cell of these shapes; the
-    // per-cell signature exists for tilings whose units are not uniform.
-    digitSize: (_coords, digits) => digitFontSize(layout, digits),
-    glyphSize: () => glyphFontSize(layout),
+    digitSize: (c, digits) => sizes().digitSize(c, digits),
+    glyphSize: (c) => sizes().glyphSize(c),
   };
   return layout;
 }
 
-// Pointy-top hexes in odd-r offset: odd rows sit half a cell right, and rows
-// overlap vertically because the row step is three quarters of the height.
-// The inscribed circle spans the full flat-to-flat width, which makes hex the
-// roomiest of the three for its footprint.
+// Flat-top hexes in odd-q offset: odd columns sit half a cell down, and
+// columns overlap horizontally because the column step is three quarters of
+// the width. Flat top and bottom, points to left and right -- the horizontal
+// edge reads the way the triangles and the pentagons do.
+//
+// The inscribed circle spans the flat-to-flat height, so that is the content.
 function hexLayout(content: number): Layout {
-  const w = content;
-  const h = (2 * content) / ROOT3;
-  const rowStep = 0.75 * h;
+  const h = content;
+  const w = (2 * content) / ROOT3;
+  const colStep = 0.75 * w;
   const origin = (c: Coords): Point => ({
-    x: c.y * w + (Math.abs(c.x % 2) === 1 ? w / 2 : 0),
-    y: c.x * rowStep,
+    x: c.y * colStep,
+    y: c.x * h + (Math.abs(c.y % 2) === 1 ? h / 2 : 0),
   });
+  let fitted: FittedSizes | null = null;
+  const sizes = (): FittedSizes => {
+    if (fitted === null) {
+      fitted = fittedSizes(layout, [new Coords(0, 0)]);
+    }
+    return fitted;
+  };
   const layout: Layout = {
     shape: Shape.hex,
     content,
     origin,
     cellWidth: w,
     cellHeight: h,
-    boardWidth: (_rows, cols) => cols * w + w / 2,
-    boardHeight: (rows) => (rows - 1) * rowStep + h,
+    boardWidth: (_rows, cols) => cols * colStep + w / 4,
+    boardHeight: (rows, cols) => rows * h + (cols > 1 ? h / 2 : 0),
     polygon: (c) => {
       const o = origin(c);
       return [
-        { x: o.x + w / 2, y: o.y },
-        { x: o.x + w, y: o.y + h / 4 },
-        { x: o.x + w, y: o.y + (3 * h) / 4 },
-        { x: o.x + w / 2, y: o.y + h },
-        { x: o.x, y: o.y + (3 * h) / 4 },
-        { x: o.x, y: o.y + h / 4 },
+        { x: o.x + w / 4, y: o.y },
+        { x: o.x + (3 * w) / 4, y: o.y },
+        { x: o.x + w, y: o.y + h / 2 },
+        { x: o.x + (3 * w) / 4, y: o.y + h },
+        { x: o.x + w / 4, y: o.y + h },
+        { x: o.x, y: o.y + h / 2 },
       ];
     },
     center: (c) => {
       const o = origin(c);
       return { x: o.x + w / 2, y: o.y + h / 2 };
     },
-    // The closed forms answer the same for every cell of these shapes; the
-    // per-cell signature exists for tilings whose units are not uniform.
-    digitSize: (_coords, digits) => digitFontSize(layout, digits),
-    glyphSize: () => glyphFontSize(layout),
+    digitSize: (c, digits) => sizes().digitSize(c, digits),
+    glyphSize: (c) => sizes().glyphSize(c),
   };
   return layout;
 }
@@ -129,6 +196,17 @@ function hexLayout(content: number): Layout {
 // side is content * sqrt(3), which is what it takes for the inscribed circle
 // to match the other two shapes.
 function triangleLayout(content: number): Layout {
+  let fitted: FittedSizes | null = null;
+  const sizes = (): FittedSizes => {
+    if (fitted === null) {
+      fitted = fittedSizes(
+        layout,
+        [new Coords(0, 0), new Coords(0, 1)],
+        (c) => (pointsUp(c) ? 0 : 1)
+      );
+    }
+    return fitted;
+  };
   const side = content * ROOT3;
   const h = (side * ROOT3) / 2;
   const colStep = side / 2;
@@ -163,10 +241,8 @@ function triangleLayout(content: number): Layout {
         y: pointsUp(c) ? o.y + (2 * h) / 3 : o.y + h / 3,
       };
     },
-    // The closed forms answer the same for every cell of these shapes; the
-    // per-cell signature exists for tilings whose units are not uniform.
-    digitSize: (_coords, digits) => digitFontSize(layout, digits),
-    glyphSize: () => glyphFontSize(layout),
+    digitSize: (c, digits) => sizes().digitSize(c, digits),
+    glyphSize: (c) => sizes().glyphSize(c),
   };
   return layout;
 }
@@ -314,45 +390,13 @@ const DIGIT_CAP_EM = 0.729;
 const EMOJI_WIDTH_EM = 1.25;
 const EMOJI_HEIGHT_EM = 1.18;
 
-// Room to breathe. The geometry above says where a glyph would just touch the
-// outline; a cell that reads well keeps it well short of that.
+// Room to breathe. The fit says where a glyph would just touch the outline; a
+// cell that reads well keeps it well short of that.
 export const FILL = 0.82;
 
-// The largest font size at which a text box of widthEm x heightEm, centred on
-// the cell's content centre, stays inside the outline.
-export function fitFontSize(
-  layout: Layout,
-  widthEm: number,
-  heightEm: number,
-  inset = 0
-): number {
-  const c = layout.content - 2 * inset;
-  switch (layout.shape) {
-    case Shape.hex: {
-      // Full width across the middle half of the height, then closing toward
-      // the points. A box short enough to stay in that middle band is limited
-      // only by the width; a taller one has to clear the slanted sides, which
-      // works out to content >= (width + sqrt(3) * height) / 2.
-      const h = (2 * c) / ROOT3;
-      const byWidth = c / widthEm;
-      const withinBand = h / 2 / heightEm;
-      return byWidth <= withinBand
-        ? FILL * byWidth
-        : FILL * ((2 * c) / (widthEm + ROOT3 * heightEm));
-    }
-    case Shape.triangle: {
-      // Half-width at depth y is (y / h)(side / 2). Requiring the box's top
-      // corners to sit inside, with the box centred on the incentre, reduces
-      // to content >= 0.866 * width + height / 2.
-      const byOutline = c / ((ROOT3 / 2) * widthEm + heightEm / 2);
-      // And the box still has to fit between the incentre and the base.
-      const byHeight = c / heightEm;
-      return FILL * Math.min(byOutline, byHeight);
-    }
-    default:
-      return FILL * Math.min(c / widthEm, c / heightEm);
-  }
-}
+// Glyphs are drawn with a dark outline, which grows the mark by its width on
+// every side, so the room it takes has to come off the fit.
+export const GLYPH_OUTLINE_PX = 1.25;
 
 // The box a piece of text occupies, in em, so a check can put the corners
 // back on the board and confirm they land inside the cell.
@@ -364,27 +408,13 @@ export function glyphBoxEm(): { width: number; height: number } {
   return { width: EMOJI_WIDTH_EM, height: EMOJI_HEIGHT_EM };
 }
 
-export function digitFontSize(layout: Layout, digits: number): number {
-  const box = digitBoxEm(digits);
-  return fitFontSize(layout, box.width, box.height);
-}
-
-// Glyphs are drawn with a dark outline around them, which grows the mark by
-// its width on every side, so the room it takes has to come off the fit.
-export const GLYPH_OUTLINE_PX = 1.25;
-
-export function glyphFontSize(layout: Layout): number {
-  const box = glyphBoxEm();
-  return fitFontSize(layout, box.width, box.height, GLYPH_OUTLINE_PX);
-}
-
 // True when what the layout will actually draw in a cell stays inside that
 // cell's outline.
 //
-// This asks the layout for the size rather than deriving one, which matters
-// once shapes come from a catalogue: fitFontSize has a case per shape and a
-// fallback, and a pentagon quietly taking the square's fallback is exactly
-// the kind of wrong that renders without complaining.
+// This asks the layout for the size rather than deriving one. When each shape
+// had its own formula, the formula also had a fallback, and a pentagon
+// quietly taking the square's fallback rendered without complaining. There is
+// now one fit for every shape, measured against the outline.
 export function contentFitsCell(
   layout: Layout,
   coords: Coords,

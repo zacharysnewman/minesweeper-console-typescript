@@ -40,19 +40,19 @@ const squareOffsets: Offset[] = [
 ];
 
 // --- hex: 6 -----------------------------------------------------------------
-// Odd-r offset: odd rows sit half a cell to the right, which is why the row
-// above and below shift with the parity of x. Hexes have no vertex-only
-// contact, so these six are both the edge neighbours and the whole
-// neighbourhood.
-const hexEvenRowOffsets: Offset[] = [
-  [-1, -1], [-1, 0],
-  [0, -1], [0, 1],
-  [1, -1], [1, 0],
+// Flat-top hexes in odd-q offset: odd columns sit half a cell down, which is
+// why the columns either side shift with the parity of y. Hexes have no
+// vertex-only contact, so these six are both the edge neighbours and the
+// whole neighbourhood.
+const hexEvenColumnOffsets: Offset[] = [
+  [-1, -1], [0, -1],
+  [-1, 0], [1, 0],
+  [-1, 1], [0, 1],
 ];
-const hexOddRowOffsets: Offset[] = [
-  [-1, 0], [-1, 1],
-  [0, -1], [0, 1],
-  [1, 0], [1, 1],
+const hexOddColumnOffsets: Offset[] = [
+  [0, -1], [1, -1],
+  [-1, 0], [1, 0],
+  [0, 1], [1, 1],
 ];
 
 // --- triangle: 12 -----------------------------------------------------------
@@ -93,7 +93,7 @@ const hex: Topology = {
   neighbours: (coords) =>
     offsetsToCoords(
       coords,
-      coords.x % 2 === 0 ? hexEvenRowOffsets : hexOddRowOffsets
+      coords.y % 2 === 0 ? hexEvenColumnOffsets : hexOddColumnOffsets
     ),
 };
 

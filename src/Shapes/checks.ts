@@ -42,6 +42,7 @@ import {
 } from "./Tiling";
 import { pentagonTilings } from "./pentagons";
 import { TILINGS, topologyFor } from "./Topology";
+import { layoutFor as layoutForShape } from "./geometry";
 
 // The project has no test runner, so the shape rules check themselves:
 // `npm run shapes:check`. The adjacency properties below are the point of the
@@ -508,6 +509,64 @@ for (const shape of allShapes) {
       contentFitsCell(layout, coords, "glyph")
     );
   }
+}
+
+console.log("\nhand tables against what is drawn\n");
+
+// The three hand written tables and the shapes actually drawn on screen are
+// two separate descriptions of the same tiling, and nothing had been checking
+// they agreed. They can drift: turning the hexes flat-top means their offsets
+// branch on the column instead of the row, and a table left branching the old
+// way would still be symmetric, still degree six, and simply wrong about
+// which cells touch.
+//
+// So: build the polygons the layout will draw, and require two cells to be
+// neighbours exactly when their outlines share a point.
+for (const shape of allShapes) {
+  const name = shapeName(shape);
+  const topology = topologyFor(shape);
+  const layout = layoutFor(shape, 40);
+  const span = 8;
+  const patch: Coords[] = [];
+  for (let x = 0; x < span; x++) {
+    for (let y = 0; y < span; y++) {
+      patch.push(new Coords(x, y));
+    }
+  }
+  const polygons = new Map<string, Point[]>();
+  for (const c of patch) {
+    polygons.set(key(c), layout.polygon(c));
+  }
+  const share = (a: Coords, b: Coords): boolean => {
+    const pa = polygons.get(key(a)) as Point[];
+    const pb = polygons.get(key(b)) as Point[];
+    return pa.some((p) =>
+      pb.some((q) => Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6)
+    );
+  };
+
+  // Only cells whose whole neighbourhood is inside the patch can be judged.
+  const inner = patch.filter(
+    (c) => c.x > 1 && c.x < span - 2 && c.y > 1 && c.y < span - 2
+  );
+  let disagreements = 0;
+  for (const c of inner) {
+    const listed = new Set(
+      topology.neighbours(c).map((n) => key(n))
+    );
+    for (const other of patch) {
+      if (key(other) === key(c)) {
+        continue;
+      }
+      if (share(c, other) !== listed.has(key(other))) {
+        disagreements++;
+      }
+    }
+  }
+  check(
+    `${name}: the neighbour table matches the outlines drawn (${inner.length} cells)`,
+    inner.length > 0 && disagreements === 0
+  );
 }
 
 console.log("\ntilings described as geometry\n");
