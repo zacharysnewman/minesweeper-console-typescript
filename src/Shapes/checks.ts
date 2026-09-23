@@ -37,6 +37,7 @@ import {
   checkCoverage,
   deriveOffsets,
   fundamentalArea,
+  polygonsTouch,
   rotateTiling,
   Tiling,
 } from "./Tiling";
@@ -537,13 +538,11 @@ for (const shape of allShapes) {
   for (const c of patch) {
     polygons.set(key(c), layout.polygon(c));
   }
-  const share = (a: Coords, b: Coords): boolean => {
-    const pa = polygons.get(key(a)) as Point[];
-    const pb = polygons.get(key(b)) as Point[];
-    return pa.some((p) =>
-      pb.some((q) => Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6)
+  const share = (a: Coords, b: Coords): boolean =>
+    polygonsTouch(
+      polygons.get(key(a)) as Point[],
+      polygons.get(key(b)) as Point[]
     );
-  };
 
   // Only cells whose whole neighbourhood is inside the patch can be judged.
   const inner = patch.filter(

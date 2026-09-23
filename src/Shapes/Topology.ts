@@ -1,6 +1,6 @@
 import { Coords } from "../State/Coords";
 import { Shape } from "./Shape";
-import { hexagonThirds } from "./pentagons";
+import { hexagonHalves, hexagonThirds, houseRows } from "./pentagons";
 import { addressOf, columnOf, deriveOffsets, Tiling } from "./Tiling";
 
 // A tiling's adjacency, and nothing else.
@@ -133,16 +133,24 @@ export function topologyFromTiling(shape: Shape, tiling: Tiling): Topology {
 
 // The tilings that are given as geometry instead of as an offset table.
 export const TILINGS: Partial<Record<Shape, Tiling>> = {
-  [Shape.pentagon]: hexagonThirds,
+  [Shape.pentagonThirds]: hexagonThirds,
+  [Shape.pentagonHalves]: hexagonHalves,
+  [Shape.pentagonHouses]: houseRows,
 };
-
-const pentagon: Topology = topologyFromTiling(Shape.pentagon, hexagonThirds);
 
 const topologies: Record<Shape, Topology> = {
   [Shape.square]: square,
   [Shape.hex]: hex,
   [Shape.triangle]: triangle,
-  [Shape.pentagon]: pentagon,
+  [Shape.pentagonThirds]: topologyFromTiling(
+    Shape.pentagonThirds,
+    hexagonThirds
+  ),
+  [Shape.pentagonHalves]: topologyFromTiling(
+    Shape.pentagonHalves,
+    hexagonHalves
+  ),
+  [Shape.pentagonHouses]: topologyFromTiling(Shape.pentagonHouses, houseRows),
 };
 
 export function topologyFor(shape: Shape): Topology {

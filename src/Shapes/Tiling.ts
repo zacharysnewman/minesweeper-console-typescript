@@ -78,19 +78,51 @@ export function polygonAt(
 // last few bits.
 const TOUCH_EPSILON = 1e-7;
 
-function touches(a: readonly Point[], b: readonly Point[]): boolean {
-  for (const p of a) {
-    for (const q of b) {
-      if (
-        Math.abs(p.x - q.x) < TOUCH_EPSILON &&
-        Math.abs(p.y - q.y) < TOUCH_EPSILON
-      ) {
-        return true;
-      }
+// Comparing corner against corner is not enough.
+//
+// It is enough for a tiling that is edge-to-edge, where cells meet corner to
+// corner and the first three shapes all do. Most pentagon tilings are not:
+// one cell's corner lands part way along another's edge, a T-junction, and
+// there no corner coincides with any corner at all. A tiling of houses read
+// as degree four that way, when its cells plainly share five edges.
+//
+// So a corner counts as touching when it lies anywhere on the other outline,
+// and both directions are asked, since a T-junction is one-sided.
+function onSegment(p: Point, a: Point, b: Point): boolean {
+  const ex = b.x - a.x;
+  const ey = b.y - a.y;
+  const length = Math.hypot(ex, ey);
+  if (length < TOUCH_EPSILON) {
+    return Math.hypot(p.x - a.x, p.y - a.y) < TOUCH_EPSILON;
+  }
+  // Off the line, or past either end.
+  const cross = (ex * (p.y - a.y) - ey * (p.x - a.x)) / length;
+  if (Math.abs(cross) > TOUCH_EPSILON) {
+    return false;
+  }
+  const along = (ex * (p.x - a.x) + ey * (p.y - a.y)) / length;
+  return along >= -TOUCH_EPSILON && along <= length + TOUCH_EPSILON;
+}
+
+function onBoundary(p: Point, polygon: readonly Point[]): boolean {
+  for (let i = 0; i < polygon.length; i++) {
+    if (onSegment(p, polygon[i], polygon[(i + 1) % polygon.length])) {
+      return true;
     }
   }
   return false;
 }
+
+export function polygonsTouch(
+  a: readonly Point[],
+  b: readonly Point[]
+): boolean {
+  return (
+    a.some((p) => onBoundary(p, b)) || b.some((q) => onBoundary(q, a))
+  );
+}
+
+const touches = polygonsTouch;
 
 // The neighbours of each polygon in the unit, as lattice offsets.
 //

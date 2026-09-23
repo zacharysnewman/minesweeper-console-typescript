@@ -82,6 +82,66 @@ export const hexagonThirds: Tiling = rotateTiling(
   Math.PI
 );
 
+// Hexagon halves.
+//
+// Any hexagon with a centre of symmetry, cut straight from one edge midpoint
+// to the opposite one, falls into two congruent pentagons -- the cut takes
+// two corners off each side and leaves five. Centrally symmetric hexagons
+// tile, so these do. Seven neighbours each.
+const halfA: Point[] = [
+  midpoint(0),
+  corner(1),
+  corner(2),
+  corner(3),
+  midpoint(3),
+];
+const halfB: Point[] = [
+  midpoint(3),
+  corner(4),
+  corner(5),
+  corner(0),
+  midpoint(0),
+];
+
+export const hexagonHalves: Tiling = rotateTiling(
+  {
+    cells: 4,
+    across: P(3, 0),
+    down: P(0, ROOT3),
+    unit: [
+      halfA,
+      halfB,
+      shift(halfA, 1.5, ROOT3 / 2),
+      shift(halfB, 1.5, ROOT3 / 2),
+    ],
+  },
+  Math.PI
+);
+
+// House rows.
+//
+// A pentagon shaped like a house, in rows, with every other one turned over
+// so its point drops into the notch between two roofs. Its two upright sides
+// are parallel, which is the condition the simplest family of the fifteen is
+// named for.
+//
+// This one is not edge-to-edge: a roof meets two different neighbours along
+// its length, and the corners do not line up. That is what made it worth
+// having here -- it was this tiling that showed the adjacency was only
+// comparing corner against corner, and reading as degree four when its cells
+// share five edges.
+export const houseRows: Tiling = {
+  cells: 2,
+  across: P(1, 0),
+  down: P(0, 2.5),
+  unit: [
+    [P(0.5, 0), P(1, 0.5), P(1, 1.5), P(0, 1.5), P(0, 0.5)],
+    [P(1, 0.5), P(1.5, 0), P(1.5, -1), P(0.5, -1), P(0.5, 0)],
+  ],
+};
+
 export const pentagonTilings: { name: string; tiling: Tiling }[] = [
   { name: "hexagon thirds", tiling: hexagonThirds },
+  { name: "hexagon halves", tiling: hexagonHalves },
+  { name: "house rows", tiling: houseRows },
 ];

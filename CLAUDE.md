@@ -156,6 +156,39 @@ just the cell under the cursor (excluding one cell almost never cascades at
 degree 12), and the flood fill is iterative over a `"x,y"` index rather than
 recursive over a linear scan.
 
+## Tilings given as geometry
+
+Shapes beyond the first three are described as **polygons plus two lattice
+vectors** (`src/Shapes/Tiling.ts`), and their adjacency is *computed* rather
+than written out. Cells still address as `Coords`: the index within the
+primitive unit folds into the column, `y = unitColumn * cells + indexInUnit`,
+so the board stays a rectangular array.
+
+A tiling's board is rectangular only while its lattice is axis aligned.
+Quarter and half turns keep that; a sixth or a twelfth of a turn shears it.
+Where a natural basis shears — hexagon centres step half a hexagon down as
+they step one across — take two cells per unit instead and the shear goes.
+
+Four things must hold, and each catches something the others miss:
+
+- **Coverage.** Sample the fundamental domain; every point in exactly one
+  cell. A gap gives zero, an overlap gives two.
+- **Symmetry.** `b ∈ N(a) ⟺ a ∈ N(b)`.
+- **The hand tables against the outlines.** The first three shapes carry hand
+  written offsets *and* draw polygons; they are two descriptions and they can
+  disagree. Only this one catches a parity branching on the wrong axis — the
+  table stays symmetric, the right degree, and simply wrong.
+- **Known degrees.** Coverage, symmetry and area can all pass for a tiling
+  that is not the one you meant. A triangle unit with the wrong row step
+  tiles the plane perfectly well as a *different*, degree-4 tiling. The three
+  shipped shapes are permanent fixtures for this reason.
+
+**Contact is not corner-to-corner.** Most pentagon tilings are not edge to
+edge: one cell's corner lands part way along another's edge, and there no
+corners coincide at all. `polygonsTouch` asks whether a corner lies anywhere
+on the other outline, both directions, because a T-junction is one-sided. A
+tiling of houses read as degree 4 while sharing five edges before this.
+
 **Its event tokens must not share a name with `src/Events/Events.ts`.**
 `EventAggregator` keys subscribers by the token's `name` string, so a
 collision silently wires the two games together — no type error, no runtime
@@ -358,10 +391,13 @@ Triangle content sits on the **incentre**, a third of the height from the
 base, so an up-pointing cell's glyph rides low and a down-pointing one's rides
 high.
 
-**Fitting text is per shape, and is not the inscribed circle.** Text is a wide,
-short box. A square or hex is at full width across its middle; a triangle
-closes toward its apex, so what binds there is the box's top corners. Do not
-reach for `content / hypot(w, h)` — it overflows triangles.
+**Fitting text is measured, not derived.** There was a formula per shape once.
+A formula per shape also has a fallback, and a pentagon quietly taking the
+square's fallback renders without complaining. `fitTextInPolygon` binary
+searches against the outline itself and puts content on the Chebyshev centre;
+it reproduced all three hand formulas before replacing them. Computed once
+per distinct cell shape, and asked of the **cell**, since a primitive unit
+need not be uniform.
 
 **Never hardcode a font metric without measuring it.** Two shipped wrong: the
 numbers are drawn bold, which advances 0.696em per digit rather than the

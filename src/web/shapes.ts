@@ -25,7 +25,9 @@ const SHAPES: Record<string, Shape> = {
   square: Shape.square,
   hex: Shape.hex,
   triangle: Shape.triangle,
-  pentagon: Shape.pentagon,
+  pentagonThirds: Shape.pentagonThirds,
+  pentagonHalves: Shape.pentagonHalves,
+  pentagonHouses: Shape.pentagonHouses,
 };
 
 // A triangle advances half a cell per column, so it needs a bigger cell to
@@ -34,7 +36,9 @@ const PREFERRED_CELL: Record<Shape, number> = {
   [Shape.square]: 30,
   [Shape.hex]: 30,
   [Shape.triangle]: 34,
-  [Shape.pentagon]: 30,
+  [Shape.pentagonThirds]: 30,
+  [Shape.pentagonHalves]: 30,
+  [Shape.pentagonHouses]: 30,
 };
 
 // Below this a board stops being readable, and scrolling is the better answer
