@@ -36,6 +36,15 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(16, 32, 53, Shape.triangle),
     expert: new BoardInfo(16, 60, 132, Shape.triangle),
   },
+  // Pentagons come six to a primitive unit and the unit is two hexagons wide,
+  // so a column is a third the width of a row is tall. The columns are chosen
+  // to come out roughly square on screen, and every one of them is a multiple
+  // of six because a board cannot hold part of a unit.
+  [Shape.pentagon]: {
+    beginner: new BoardInfo(6, 18, 18, Shape.pentagon),
+    intermediate: new BoardInfo(9, 30, 56, Shape.pentagon),
+    expert: new BoardInfo(12, 42, 139, Shape.pentagon),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];

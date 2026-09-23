@@ -3,13 +3,7 @@ import { Tile } from "../State/Tile";
 import { TileState } from "../State/TileState";
 import { WinLoseStatus } from "../State/WinLoseStatus";
 import { Board } from "./Board";
-import {
-  layoutFor,
-  digitFontSize,
-  glyphFontSize,
-  GLYPH_OUTLINE_PX,
-  Layout,
-} from "./geometry";
+import { layoutFor, GLYPH_OUTLINE_PX, Layout } from "./geometry";
 import { BOARD_FACE, colorForCount } from "./numberPalette";
 
 // Board markup as a string, with no DOM calls, so the same drawing runs in a
@@ -148,7 +142,7 @@ export function cellSvg(
   ];
 
   if (art.glyph !== undefined) {
-    const size = glyphFontSize(layout);
+    const size = layout.glyphSize(coords);
     parts.push(
       `<text x="${centre.x.toFixed(2)}" y="${centre.y.toFixed(2)}" ` +
         `font-size="${size.toFixed(2)}" text-anchor="middle" ` +
@@ -158,7 +152,7 @@ export function cellSvg(
     );
   } else if (art.count !== undefined) {
     const digits = String(art.count).length;
-    const size = digitFontSize(layout, digits);
+    const size = layout.digitSize(coords, digits);
     parts.push(
       `<text x="${centre.x.toFixed(2)}" y="${centre.y.toFixed(2)}" ` +
         `font-size="${size.toFixed(2)}" fill="${colorForCount(art.count)}" ` +
@@ -188,8 +182,8 @@ export function boardSvg(board: Board, content: number): string {
       )
     )
     .join("");
-  const w = layout.boardWidth(board.info.cols);
-  const h = layout.boardHeight(board.info.rows);
+  const w = layout.boardWidth(board.info.rows, board.info.cols);
+  const h = layout.boardHeight(board.info.rows, board.info.cols);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(0)}" height="${h.toFixed(0)}" viewBox="0 0 ${w.toFixed(2)} ${h.toFixed(2)}">${cells}</svg>`;
 }
 

@@ -1,11 +1,12 @@
 import { Coords } from "../State/Coords";
+import { Point } from "./Point";
 import { Shape } from "./Shape";
-import { pointsUp } from "./Topology";
+import { pointsUp, TILINGS } from "./Topology";
+import { addressOf, polygonAt, Tiling } from "./Tiling";
 
-export interface Point {
-  readonly x: number;
-  readonly y: number;
-}
+// A type, so the re-export has to say so: the bundler strips types and would
+// otherwise look for a runtime value that was never there.
+export type { Point } from "./Point";
 
 // Where a cell sits, what outline it has, and how much room it has inside.
 //
@@ -25,8 +26,10 @@ export interface Layout {
   // not the same as the distance between cells.
   readonly cellWidth: number;
   readonly cellHeight: number;
-  boardWidth(cols: number): number;
-  boardHeight(rows: number): number;
+  // A lattice that is not axis aligned puts the board's extent in both
+  // directions, so both are needed to size it.
+  boardWidth(rows: number, cols: number): number;
+  boardHeight(rows: number, cols: number): number;
   // The cell's bounding box on the board. Cells overlap for hex and triangle,
   // so a renderer that positions boxes absolutely needs this as well as the
   // outline that sits inside it.
@@ -37,6 +40,11 @@ export interface Layout {
   // its incentre sits a third of the height from the base, so an up-pointing
   // cell's content rides low and a down-pointing cell's rides high.
   center(coords: Coords): Point;
+  // How big content may be drawn in this particular cell. Per cell rather
+  // than per shape, because a tiling's primitive unit can hold cells that are
+  // not all the same -- the first three simply answer the same for each.
+  digitSize(coords: Coords, digits: number): number;
+  glyphSize(coords: Coords): number;
 }
 
 const ROOT3 = Math.sqrt(3);
@@ -44,13 +52,13 @@ const ROOT3 = Math.sqrt(3);
 function squareLayout(content: number): Layout {
   const s = content;
   const origin = (c: Coords): Point => ({ x: c.y * s, y: c.x * s });
-  return {
+  const layout: Layout = {
     shape: Shape.square,
     content,
     origin,
     cellWidth: s,
     cellHeight: s,
-    boardWidth: (cols) => cols * s,
+    boardWidth: (_rows, cols) => cols * s,
     boardHeight: (rows) => rows * s,
     polygon: (c) => {
       const o = origin(c);
@@ -65,7 +73,12 @@ function squareLayout(content: number): Layout {
       const o = origin(c);
       return { x: o.x + s / 2, y: o.y + s / 2 };
     },
+    // The closed forms answer the same for every cell of these shapes; the
+    // per-cell signature exists for tilings whose units are not uniform.
+    digitSize: (_coords, digits) => digitFontSize(layout, digits),
+    glyphSize: () => glyphFontSize(layout),
   };
+  return layout;
 }
 
 // Pointy-top hexes in odd-r offset: odd rows sit half a cell right, and rows
@@ -80,13 +93,13 @@ function hexLayout(content: number): Layout {
     x: c.y * w + (Math.abs(c.x % 2) === 1 ? w / 2 : 0),
     y: c.x * rowStep,
   });
-  return {
+  const layout: Layout = {
     shape: Shape.hex,
     content,
     origin,
     cellWidth: w,
     cellHeight: h,
-    boardWidth: (cols) => cols * w + w / 2,
+    boardWidth: (_rows, cols) => cols * w + w / 2,
     boardHeight: (rows) => (rows - 1) * rowStep + h,
     polygon: (c) => {
       const o = origin(c);
@@ -103,7 +116,12 @@ function hexLayout(content: number): Layout {
       const o = origin(c);
       return { x: o.x + w / 2, y: o.y + h / 2 };
     },
+    // The closed forms answer the same for every cell of these shapes; the
+    // per-cell signature exists for tilings whose units are not uniform.
+    digitSize: (_coords, digits) => digitFontSize(layout, digits),
+    glyphSize: () => glyphFontSize(layout),
   };
+  return layout;
 }
 
 // Triangles alternate point-up and point-down along a row and advance only
@@ -115,13 +133,13 @@ function triangleLayout(content: number): Layout {
   const h = (side * ROOT3) / 2;
   const colStep = side / 2;
   const origin = (c: Coords): Point => ({ x: c.y * colStep, y: c.x * h });
-  return {
+  const layout: Layout = {
     shape: Shape.triangle,
     content,
     origin,
     cellWidth: side,
     cellHeight: h,
-    boardWidth: (cols) => (cols + 1) * colStep,
+    boardWidth: (_rows, cols) => (cols + 1) * colStep,
     boardHeight: (rows) => rows * h,
     polygon: (c) => {
       const o = origin(c);
@@ -145,10 +163,19 @@ function triangleLayout(content: number): Layout {
         y: pointsUp(c) ? o.y + (2 * h) / 3 : o.y + h / 3,
       };
     },
+    // The closed forms answer the same for every cell of these shapes; the
+    // per-cell signature exists for tilings whose units are not uniform.
+    digitSize: (_coords, digits) => digitFontSize(layout, digits),
+    glyphSize: () => glyphFontSize(layout),
   };
+  return layout;
 }
 
 export function layoutFor(shape: Shape, content: number): Layout {
+  const tiling = TILINGS[shape];
+  if (tiling !== undefined) {
+    return tilingLayout(shape, tiling, content);
+  }
   switch (shape) {
     case Shape.hex:
       return hexLayout(content);
@@ -157,6 +184,113 @@ export function layoutFor(shape: Shape, content: number): Layout {
     default:
       return squareLayout(content);
   }
+}
+
+// A layout for a tiling given as geometry.
+//
+// Everything is measured off the polygons rather than computed from a
+// formula, which is the only way it could work for shapes chosen from a
+// catalogue. The per-cell work -- the outline, where its content sits, how
+// big that content can be -- depends only on which cell of the primitive
+// unit this is, so it is done once per unit index and then translated.
+export function tilingLayout(
+  shape: Shape,
+  tiling: Tiling,
+  content: number
+): Layout {
+  const inradii = tiling.unit.map((p) => chebyshevCenter(p).radius);
+  const scale = content / 2 / Math.min(...inradii);
+
+  const scaled = tiling.unit.map((polygon) =>
+    polygon.map((p) => ({ x: p.x * scale, y: p.y * scale }))
+  );
+  // Unit polygons are written around their own origin, so shift the whole
+  // board until nothing sits at a negative coordinate.
+  const flat = scaled.flat();
+  const shiftX = -Math.min(...flat.map((p) => p.x));
+  const shiftY = -Math.min(...flat.map((p) => p.y));
+  const unit = scaled.map((polygon) =>
+    polygon.map((p) => ({ x: p.x + shiftX, y: p.y + shiftY }))
+  );
+
+  const across = { x: tiling.across.x * scale, y: tiling.across.y * scale };
+  const down = { x: tiling.down.x * scale, y: tiling.down.y * scale };
+
+  const centres = unit.map((p) => chebyshevCenter(p).center);
+  const boxes = unit.map((polygon) => ({
+    minX: Math.min(...polygon.map((p) => p.x)),
+    minY: Math.min(...polygon.map((p) => p.y)),
+    maxX: Math.max(...polygon.map((p) => p.x)),
+    maxY: Math.max(...polygon.map((p) => p.y)),
+  }));
+  const digitSizes = unit.map((polygon, i) =>
+    [1, 2, 3].map((digits) => {
+      const box = digitBoxEm(digits);
+      return fitTextInPolygon(polygon, centres[i], box.width, box.height, 0);
+    })
+  );
+  const glyphSizes = unit.map((polygon, i) =>
+    fitTextInPolygon(
+      polygon,
+      centres[i],
+      glyphBoxEm().width,
+      glyphBoxEm().height,
+      GLYPH_OUTLINE_PX
+    )
+  );
+
+  const offsetOf = (coords: Coords): Point => {
+    const at = addressOf(coords.x, coords.y, tiling);
+    return {
+      x: at.unitColumn * across.x + at.row * down.x,
+      y: at.unitColumn * across.y + at.row * down.y,
+    };
+  };
+  const indexOf = (coords: Coords): number =>
+    addressOf(coords.x, coords.y, tiling).index;
+
+  const extent = (rows: number, cols: number, pick: (b: typeof boxes[0]) => number, axis: "x" | "y") => {
+    const unitColumns = Math.max(1, Math.ceil(cols / tiling.cells));
+    let best = -Infinity;
+    for (const r of [0, Math.max(0, rows - 1)]) {
+      for (const c of [0, Math.max(0, unitColumns - 1)]) {
+        for (const box of boxes) {
+          best = Math.max(
+            best,
+            pick(box) + c * (axis === "x" ? across.x : across.y) +
+              r * (axis === "x" ? down.x : down.y)
+          );
+        }
+      }
+    }
+    return best;
+  };
+
+  return {
+    shape,
+    content,
+    cellWidth: Math.max(...boxes.map((b) => b.maxX - b.minX)),
+    cellHeight: Math.max(...boxes.map((b) => b.maxY - b.minY)),
+    boardWidth: (rows, cols) => extent(rows, cols, (b) => b.maxX, "x"),
+    boardHeight: (rows, cols) => extent(rows, cols, (b) => b.maxY, "y"),
+    origin: (coords) => {
+      const o = offsetOf(coords);
+      const box = boxes[indexOf(coords)];
+      return { x: box.minX + o.x, y: box.minY + o.y };
+    },
+    polygon: (coords) => {
+      const o = offsetOf(coords);
+      return unit[indexOf(coords)].map((p) => ({ x: p.x + o.x, y: p.y + o.y }));
+    },
+    center: (coords) => {
+      const o = offsetOf(coords);
+      const c = centres[indexOf(coords)];
+      return { x: c.x + o.x, y: c.y + o.y };
+    },
+    digitSize: (coords, digits) =>
+      digitSizes[indexOf(coords)][Math.min(digits, 3) - 1],
+    glyphSize: (coords) => glyphSizes[indexOf(coords)],
+  };
 }
 
 // How big text may be drawn at a cell's centre and still clear the outline.
@@ -244,27 +378,35 @@ export function glyphFontSize(layout: Layout): number {
   return fitFontSize(layout, box.width, box.height, GLYPH_OUTLINE_PX);
 }
 
-// True when every corner of the text box lies inside the cell outline.
-export function textBoxFits(
+// True when what the layout will actually draw in a cell stays inside that
+// cell's outline.
+//
+// This asks the layout for the size rather than deriving one, which matters
+// once shapes come from a catalogue: fitFontSize has a case per shape and a
+// fallback, and a pentagon quietly taking the square's fallback is exactly
+// the kind of wrong that renders without complaining.
+export function contentFitsCell(
   layout: Layout,
   coords: Coords,
-  widthEm: number,
-  heightEm: number,
-  inset = 0
+  kind: "digits" | "glyph",
+  digits = 1
 ): boolean {
-  const size = fitFontSize(layout, widthEm, heightEm, inset);
+  const size =
+    kind === "glyph"
+      ? layout.glyphSize(coords)
+      : layout.digitSize(coords, digits);
+  const box = kind === "glyph" ? glyphBoxEm() : digitBoxEm(digits);
+  const inset = kind === "glyph" ? GLYPH_OUTLINE_PX : 0;
   const centre = layout.center(coords);
-  // The outline counts: what has to clear the cell is the mark plus its edge.
-  const halfWidth = (widthEm * size) / 2 + inset;
-  const halfHeight = (heightEm * size) / 2 + inset;
-  const corners: Point[] = [
+  const halfWidth = (box.width * size) / 2 + inset;
+  const halfHeight = (box.height * size) / 2 + inset;
+  const polygon = layout.polygon(coords);
+  return [
     { x: centre.x - halfWidth, y: centre.y - halfHeight },
     { x: centre.x + halfWidth, y: centre.y - halfHeight },
     { x: centre.x + halfWidth, y: centre.y + halfHeight },
     { x: centre.x - halfWidth, y: centre.y + halfHeight },
-  ];
-  const polygon = layout.polygon(coords);
-  return corners.every((corner) => inside(corner, polygon));
+  ].every((corner) => pointInPolygon(corner, polygon));
 }
 
 function inside(point: Point, polygon: Point[]): boolean {

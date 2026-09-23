@@ -31,7 +31,7 @@ import {
   GLYPH_OUTLINE_PX,
   layoutFor,
   Point,
-  textBoxFits,
+  contentFitsCell,
 } from "./geometry";
 import {
   checkCoverage,
@@ -40,7 +40,7 @@ import {
   Tiling,
 } from "./Tiling";
 import { pentagonTilings } from "./pentagons";
-import { topologyFor } from "./Topology";
+import { TILINGS, topologyFor } from "./Topology";
 
 // The project has no test runner, so the shape rules check themselves:
 // `npm run shapes:check`. The adjacency properties below are the point of the
@@ -156,8 +156,8 @@ for (const shape of allShapes) {
   );
 
   check(
-    `${name}: every cell lists exactly ${topology.degree} neighbours`,
-    cells.every((c) => topology.neighbours(c).length === topology.degree)
+    `${name}: every cell lists exactly the neighbours its degree says`,
+    cells.every((c) => topology.neighbours(c).length === topology.degreeAt(c))
   );
 
   // The one that matters: b is a's neighbour if and only if a is b's. A table
@@ -176,10 +176,10 @@ for (const shape of allShapes) {
   // Degree counted on a real board, away from the edges, is the same number.
   const b = Board.generateNewBoard(new BoardInfo(span, span, 0, shape));
   check(
-    `${name}: interior cells on a board have ${topology.degree} neighbours`,
+    `${name}: interior cells on a board keep their full degree`,
     cells
-      .filter((c) => c.x >= 2 && c.x < span - 2 && c.y >= 2 && c.y < span - 2)
-      .every((c) => b.neighbours(c).length === topology.degree)
+      .filter((c) => c.x >= 3 && c.x < span - 3 && c.y >= 3 && c.y < span - 3)
+      .every((c) => b.neighbours(c).length === topology.degreeAt(c))
   );
 
   check(
@@ -372,6 +372,16 @@ for (const shape of allShapes) {
       return info !== undefined && info.shape === shape;
     })
   );
+  // A tiling repeats a primitive unit, so a board that ends mid-unit would
+  // have cells whose neighbours were never placed.
+  const tiling = TILINGS[shape];
+  if (tiling !== undefined) {
+    check(
+      `${name}: every preset holds a whole number of primitive units`,
+      PRESET_NAMES.every((p) => PRESETS[shape][p].cols % tiling.cells === 0)
+    );
+  }
+
   check(
     `${name}: no preset asks for more bombs than it has cells`,
     PRESET_NAMES.every((p) => {
@@ -449,14 +459,28 @@ for (const shape of allShapes) {
   // A triangle's two orientations put the content centre in different places,
   // so both have to be checked. (0,0) points up and (0,1) points down; for the
   // other shapes the second is just another cell.
-  const orientations: [string, Coords][] = [
-    ["point up", new Coords(0, 0)],
-    ["point down", new Coords(0, 1)],
-  ];
+  const tiling = TILINGS[shape];
+  const orientations: [string, Coords][] =
+    tiling !== undefined
+      ? Array.from({ length: tiling.cells }, (_unused, i) => [
+          `cell ${i + 1} of the unit`,
+          new Coords(0, i),
+        ])
+      : [
+          ["point up", new Coords(0, 0)],
+          ["point down", new Coords(0, 1)],
+        ];
 
   for (const [orientation, coords] of orientations) {
-    const label = shape === Shape.triangle ? `${name} ${orientation}` : name;
-    if (shape !== Shape.triangle && orientation === "point down") {
+    const label =
+      shape === Shape.triangle || tiling !== undefined
+        ? `${name} ${orientation}`
+        : name;
+    if (
+      tiling === undefined &&
+      shape !== Shape.triangle &&
+      orientation === "point down"
+    ) {
       continue;
     }
 
@@ -465,22 +489,11 @@ for (const shape of allShapes) {
     const digits = String(widest).length;
     check(
       `${label}: a ${digits}-digit number stays inside the cell`,
-      textBoxFits(
-        layout,
-        coords,
-        digitBoxEm(digits).width,
-        digitBoxEm(digits).height
-      )
+      contentFitsCell(layout, coords, "digits", digits)
     );
     check(
       `${label}: an emoji glyph and its outline stay inside the cell`,
-      textBoxFits(
-        layout,
-        coords,
-        glyphBoxEm().width,
-        glyphBoxEm().height,
-        GLYPH_OUTLINE_PX
-      )
+      contentFitsCell(layout, coords, "glyph")
     );
   }
 }

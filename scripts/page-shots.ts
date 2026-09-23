@@ -200,7 +200,7 @@ async function main(): Promise<void> {
     problems.push("shapes: the face button is empty");
   }
 
-  for (const shape of ["square", "hex", "triangle"]) {
+  for (const shape of ["square", "hex", "triangle", "pentagon"]) {
     for (const size of ["beginner", "expert"]) {
       problems.push(...(await shoot(page, site.url, shape, size)));
     }

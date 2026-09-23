@@ -331,8 +331,8 @@ export class ShapesDomRenderer {
 
     const { board } = this.elements;
     board.replaceChildren();
-    board.style.width = `${layout.boardWidth(cols).toFixed(1)}px`;
-    board.style.height = `${layout.boardHeight(rows).toFixed(1)}px`;
+    board.style.width = `${layout.boardWidth(rows, cols).toFixed(1)}px`;
+    board.style.height = `${layout.boardHeight(rows, cols).toFixed(1)}px`;
     this.cells = [];
     this.drawn = [];
 

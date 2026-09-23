@@ -1,5 +1,7 @@
 import { Coords } from "../State/Coords";
 import { Shape } from "./Shape";
+import { hexagonThirds } from "./pentagons";
+import { addressOf, columnOf, deriveOffsets, Tiling } from "./Tiling";
 
 // A tiling's adjacency, and nothing else.
 //
@@ -11,8 +13,12 @@ import { Shape } from "./Shape";
 // against.
 export interface Topology {
   readonly shape: Shape;
-  // How many neighbours a cell away from the edges has: 8, 6 or 12.
+  // The most neighbours any cell has: 8, 6 or 12 for the first three. Kept as
+  // the maximum rather than the count, because a tiling whose primitive unit
+  // holds several different pentagons need not give them all the same number.
   readonly degree: number;
+  // How many neighbours this particular cell has, away from the edges.
+  degreeAt(coords: Coords): number;
   // Every coordinate touching this one. Some may be off the board; Board
   // filters them, the way Mining's step() leaves bounds to its caller.
   neighbours(coords: Coords): Coords[];
@@ -76,12 +82,14 @@ export function pointsUp(coords: Coords): boolean {
 const square: Topology = {
   shape: Shape.square,
   degree: 8,
+  degreeAt: () => 8,
   neighbours: (coords) => offsetsToCoords(coords, squareOffsets),
 };
 
 const hex: Topology = {
   shape: Shape.hex,
   degree: 6,
+  degreeAt: () => 6,
   neighbours: (coords) =>
     offsetsToCoords(
       coords,
@@ -92,6 +100,7 @@ const hex: Topology = {
 const triangle: Topology = {
   shape: Shape.triangle,
   degree: 12,
+  degreeAt: () => 12,
   neighbours: (coords) =>
     offsetsToCoords(
       coords,
@@ -99,10 +108,41 @@ const triangle: Topology = {
     ),
 };
 
+// A topology whose neighbour table was computed from the tiling's geometry
+// rather than written out. The derivation runs once, here, and what it
+// produces is the same kind of offset table the three above carry by hand.
+export function topologyFromTiling(shape: Shape, tiling: Tiling): Topology {
+  const offsets = deriveOffsets(tiling);
+  const degrees = offsets.map((row) => row.length);
+  return {
+    shape,
+    degree: Math.max(...degrees),
+    degreeAt: (coords) => degrees[addressOf(coords.x, coords.y, tiling).index],
+    neighbours: (coords) => {
+      const at = addressOf(coords.x, coords.y, tiling);
+      return offsets[at.index].map(
+        (o) =>
+          new Coords(
+            at.row + o.dRow,
+            columnOf(at.unitColumn + o.dUnitColumn, o.index, tiling)
+          )
+      );
+    },
+  };
+}
+
+// The tilings that are given as geometry instead of as an offset table.
+export const TILINGS: Partial<Record<Shape, Tiling>> = {
+  [Shape.pentagon]: hexagonThirds,
+};
+
+const pentagon: Topology = topologyFromTiling(Shape.pentagon, hexagonThirds);
+
 const topologies: Record<Shape, Topology> = {
   [Shape.square]: square,
   [Shape.hex]: hex,
   [Shape.triangle]: triangle,
+  [Shape.pentagon]: pentagon,
 };
 
 export function topologyFor(shape: Shape): Topology {

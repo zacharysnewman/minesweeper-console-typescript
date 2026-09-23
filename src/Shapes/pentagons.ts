@@ -29,22 +29,44 @@ const midpoint = (k: number): Point => {
   return P((a.x + b.x) / 2, (a.y + b.y) / 2);
 };
 
+// The three pentagons of one hexagon, centred on the origin.
+const third = (a: number, b: number, c: number, d: number): Point[] => [
+  P(0, 0),
+  midpoint(a),
+  corner(b),
+  corner(c),
+  midpoint(d),
+];
+
+const shift = (polygon: Point[], dx: number, dy: number): Point[] =>
+  polygon.map((p) => P(p.x + dx, p.y + dy));
+
 // Hexagon thirds.
 //
 // A regular hexagon divides into three congruent convex pentagons: from the
 // centre out to an edge midpoint, around two corners, and back to the next
 // midpoint but one. Because hexagons tile, so does this, and it needs no
 // appeal to the classification to be sure of -- the construction is the
-// proof, and the checks confirm the three pieces partition the hexagon
-// exactly.
+// proof, and the checks confirm the pieces partition the hexagons exactly.
+//
+// The unit is two hexagons, not one, which is what keeps the lattice square.
+// Hexagon centres sit at (1.5i, sqrt(3)j + i*sqrt(3)/2), so stepping one
+// hexagon across also steps half a hexagon down, and a board indexed on that
+// basis comes out as a long diagonal with a mostly empty bounding box. Taking
+// every second column instead gives the basis (3, 0) and (0, sqrt(3)) -- the
+// same set of hexagons, addressed so that a rectangle of cells draws as a
+// rectangle.
 export const hexagonThirds: Tiling = {
-  cells: 3,
-  across: P(1.5, ROOT3 / 2),
+  cells: 6,
+  across: P(3, 0),
   down: P(0, ROOT3),
   unit: [
-    [P(0, 0), midpoint(5), corner(0), corner(1), midpoint(1)],
-    [P(0, 0), midpoint(1), corner(2), corner(3), midpoint(3)],
-    [P(0, 0), midpoint(3), corner(4), corner(5), midpoint(5)],
+    third(5, 0, 1, 1),
+    third(1, 2, 3, 3),
+    third(3, 4, 5, 5),
+    shift(third(5, 0, 1, 1), 1.5, ROOT3 / 2),
+    shift(third(1, 2, 3, 3), 1.5, ROOT3 / 2),
+    shift(third(3, 4, 5, 5), 1.5, ROOT3 / 2),
   ],
 };
 

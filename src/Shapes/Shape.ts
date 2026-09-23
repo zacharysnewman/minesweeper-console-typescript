@@ -9,16 +9,23 @@ export enum Shape {
   square,
   hex,
   triangle,
+  pentagon,
 }
 
 const names: Record<Shape, string> = {
   [Shape.square]: "square",
   [Shape.hex]: "hex",
   [Shape.triangle]: "triangle",
+  [Shape.pentagon]: "pentagon",
 };
 
 export function shapeName(shape: Shape): string {
   return names[shape];
 }
 
-export const allShapes: Shape[] = [Shape.square, Shape.hex, Shape.triangle];
+export const allShapes: Shape[] = [
+  Shape.square,
+  Shape.hex,
+  Shape.triangle,
+  Shape.pentagon,
+];

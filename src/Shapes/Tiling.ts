@@ -1,4 +1,4 @@
-import { Point } from "./geometry";
+import { Point } from "./Point";
 
 // A tiling described by its geometry rather than by a table of offsets.
 //

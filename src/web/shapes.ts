@@ -25,6 +25,7 @@ const SHAPES: Record<string, Shape> = {
   square: Shape.square,
   hex: Shape.hex,
   triangle: Shape.triangle,
+  pentagon: Shape.pentagon,
 };
 
 // A triangle advances half a cell per column, so it needs a bigger cell to
@@ -33,6 +34,7 @@ const PREFERRED_CELL: Record<Shape, number> = {
   [Shape.square]: 30,
   [Shape.hex]: 30,
   [Shape.triangle]: 34,
+  [Shape.pentagon]: 30,
 };
 
 // Below this a board stops being readable, and scrolling is the better answer
@@ -50,8 +52,8 @@ function isPresetName(value: string): boolean {
 // Board width is linear in the cell size, so the width of a one-unit board
 // gives the factor to divide the available room by. A triangle expert board
 // is 61 half-cells across and would otherwise run off the side of the window.
-function cellSizeFor(shape: Shape, cols: number): number {
-  const perUnit = layoutFor(shape, 1).boardWidth(cols);
+function cellSizeFor(shape: Shape, rows: number, cols: number): number {
+  const perUnit = layoutFor(shape, 1).boardWidth(rows, cols);
   const available = Math.max(240, document.documentElement.clientWidth - 48);
   const fitted = Math.floor(available / perUnit);
   return Math.max(MIN_CELL, Math.min(PREFERRED_CELL[shape], fitted));
@@ -97,7 +99,7 @@ function start(): void {
   function newBoard(): void {
     const shape = currentShape();
     const info: BoardInfo = presetFor(shape, currentPreset());
-    renderer.setCellSize(cellSizeFor(shape, info.cols));
+    renderer.setCellSize(cellSizeFor(shape, info.rows, info.cols));
     renderer.reset();
     EventAggregator.get(GenerateBoardEvent).publish(info);
     describeShape(info);
@@ -145,9 +147,8 @@ function start(): void {
     resizeTimer = window.setTimeout(() => {
       resizeTimer = null;
       const shape = currentShape();
-      renderer.setCellSize(
-        cellSizeFor(shape, presetFor(shape, currentPreset()).cols)
-      );
+      const preset = presetFor(shape, currentPreset());
+      renderer.setCellSize(cellSizeFor(shape, preset.rows, preset.cols));
     }, 120);
   });
 }
