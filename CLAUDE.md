@@ -204,6 +204,47 @@ the natural basis leans and a leaning basis draws a long diagonal in a mostly
 empty box; where the residual drift is a simple fraction of a step, stacking
 that many rows into the unit cancels it exactly.
 
+**An arrangement can be searched for.** A type's conditions say what shape its
+pentagon is; they say nothing about how the copies sit against each other, and
+that is what a board needs. `pentagonShapes.ts` solves the shape -- the five
+angles fix the five edge directions, closing the outline is two more
+equations, and Newton takes it from there, with an unknown allowed to be an
+angle where a type pins its edges too tightly to leave one. `arrange.ts` then
+searches for the arrangement: a unit built by turning copies about a corner or
+an edge midpoint, or by two half turns, and a lattice found for it. The
+lattice is pinned by area -- whatever two vectors span it, the parallelogram
+they make has exactly the area of the unit -- which turns a search over
+vectors into a handful of candidates, each settled by the coverage check.
+
+Two things make the search trustworthy rather than merely productive. It
+recovers all four hand-built tilings, and it **refuses a regular pentagon**,
+which does not tile -- that is the whole point of there being fifteen types.
+
+**One pentagon can tile several ways.** The house is shipped as rows of two
+cells with six neighbours, and the search answers with a different, equally
+valid tiling of four cells with seven. A rediscovery check that asserts the
+known degree fails on that, and the check is what is wrong. Rediscovery
+checks that the arrangement is built from the same cell, covers the plane and
+has symmetric adjacency; the house's second tiling is pinned separately, so
+that the surprise is a fact rather than a failure.
+
+**Searching takes seconds, so what ships is the recipe.** A found arrangement
+carries a `Recipe` -- which centre, what order -- that replays in
+milliseconds at page load, and `shapes:check` runs the full search again and
+fails if the recipe is no longer what it finds. The pentagon is never written
+down either, only its conditions, because a transcription can be wrong in a
+way that still looks like a pentagon and a solved one cannot. The checks also
+demand each solved pentagon measure as its own type *and nothing else*: a
+too-symmetric choice of the free parameters satisfies a neighbouring type's
+conditions too, and then it is not an instance of the type it is named for.
+
+**What the search does not reach.** Types 2, 6, 8, 9, 10, 13, 14 and 15 are
+built, measured and correct, and no arrangement is found for them. Glide
+reflections were tried and found nothing at eight times the running time, so
+they are not in the tree. The limit is more likely the size of the unit: every
+family is one turn or two half turns, giving units of 2, 3, 4 or 6 cells,
+where several of those types have primitive units of 8, 12 or 18.
+
 **Contact is not corner-to-corner.** Most pentagon tilings are not edge to
 edge: one cell's corner lands part way along another's edge, and there no
 corners coincide at all. `polygonsTouch` asks whether a corner lies anywhere

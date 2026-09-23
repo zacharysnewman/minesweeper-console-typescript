@@ -66,6 +66,32 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(8, 64, 91, Shape.pentagonSlab),
     expert: new BoardInfo(10, 80, 189, Shape.pentagonSlab),
   },
+  // Type 4's lattice is square -- four cells in a box as wide as it is tall
+  // -- so a board that is square on screen has four times as many columns as
+  // rows. Seven neighbours, like the halves and the slab.
+  [Shape.pentagonEars]: {
+    beginner: new BoardInfo(6, 24, 20, Shape.pentagonEars),
+    intermediate: new BoardInfo(8, 32, 46, Shape.pentagonEars),
+    expert: new BoardInfo(11, 44, 114, Shape.pentagonEars),
+  },
+  // Type 5 packs twelve cells into a unit barely wider than it is tall, so a
+  // column of the array covers a twelfth of that width and the boards run
+  // very wide indeed: about twenty-one columns per row to square up.
+  //
+  // Squaring type 5's lattice takes two rows of six stacked into the unit,
+  // because the natural basis turns by a sixth and leans. That drift is
+  // invisible in the middle of a board and shows at its edges, so these keep
+  // at least four rows: at three the ragged fringe was most of the board and
+  // it read as a leaning parallelogram rather than a tiling.
+  //
+  // Eight neighbours, the same as a square, so these are the classic
+  // densities unscaled -- and expert comes out at exactly 99 mines in 480
+  // cells, which is classic expert in another shape.
+  [Shape.pentagonFan]: {
+    beginner: new BoardInfo(4, 72, 35, Shape.pentagonFan),
+    intermediate: new BoardInfo(4, 84, 52, Shape.pentagonFan),
+    expert: new BoardInfo(5, 96, 99, Shape.pentagonFan),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];

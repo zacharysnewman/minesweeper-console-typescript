@@ -1,5 +1,7 @@
 import { Point } from "./geometry";
 import { pairedPentagonTiling, rotateTiling, Tiling } from "./Tiling";
+import { buildArrangement, Recipe } from "./arrange";
+import { solvePentagon, Spec } from "./pentagonShapes";
 
 // Pentagon tilings, as geometry.
 //
@@ -154,9 +156,57 @@ export const pairedSlab: Tiling = pairedPentagonTiling([
   P(0, 1),
 ]) as Tiling;
 
+// Two more, built the other way round.
+//
+// The four above were constructed -- a hexagon cut up, a pentagon paired with
+// its own half turn -- and then measured to see which of the fifteen types
+// they turned out to be. These two start from the type instead: its
+// conditions say what shape the pentagon is, pentagonShapes solves for one,
+// and arrange.ts searches for how the copies sit. Neither the shape nor the
+// arrangement is written down here, which is the point: a transcription can
+// be wrong in a way that still looks like a pentagon, and a solved one
+// cannot.
+//
+// What is written down is the recipe the search found, because searching
+// takes seconds and replaying takes milliseconds. shapes:check runs the
+// search again and fails if the recipe is no longer what it finds.
+function fromType(spec: Spec, recipe: Recipe): Tiling {
+  const cell = solvePentagon(spec);
+  if (cell === undefined) {
+    throw new Error("pentagon does not close");
+  }
+  const tiling = buildArrangement(cell, recipe);
+  if (tiling === undefined) {
+    throw new Error("arrangement does not tile");
+  }
+  return tiling;
+}
+
+// Type 4: b = c and d = e with B = D = 90. Two right-isosceles ears, and a
+// quarter turn about the vertex between one ear's equal sides carries one of
+// its sides onto the other -- so four copies close up around that corner, and
+// that is the whole arrangement. Four angles of 90 make 360 exactly.
+export const type4Ears: Tiling = fromType(
+  (t, s) => ({ angles: [130, 90, 110, 90, 120], lengths: [t, 1, 1, s, s] }),
+  { kind: "turn", centre: { at: "corner", index: 1 }, order: 4 }
+);
+
+// Type 5: a = b and d = e with A = 60 and D = 120. Six copies turned about
+// the 60 degree corner close around it, which is where its six-fold symmetry
+// comes from; squaring the lattice up then takes two rows of six.
+//
+// Twelve cells to a unit and eight neighbours -- the most crowded board here,
+// and the only one of these that beats the square's eight.
+export const type5Fan: Tiling = fromType(
+  (t, s) => ({ angles: [60, 100, 150, 120, 110], lengths: [1, 1, s, t, t] }),
+  { kind: "turn", centre: { at: "corner", index: 0 }, order: 6 }
+);
+
 export const pentagonTilings: { name: string; tiling: Tiling }[] = [
   { name: "hexagon thirds", tiling: hexagonThirds },
   { name: "hexagon halves", tiling: hexagonHalves },
   { name: "house rows", tiling: houseRows },
   { name: "paired slab", tiling: pairedSlab },
+  { name: "type 4 ears", tiling: type4Ears },
+  { name: "type 5 fan", tiling: type5Fan },
 ];

@@ -1,6 +1,13 @@
 import { Coords } from "../State/Coords";
 import { Shape } from "./Shape";
-import { hexagonHalves, hexagonThirds, houseRows, pairedSlab } from "./pentagons";
+import {
+  hexagonHalves,
+  hexagonThirds,
+  houseRows,
+  pairedSlab,
+  type4Ears,
+  type5Fan,
+} from "./pentagons";
 import { addressOf, columnOf, deriveOffsets, Tiling } from "./Tiling";
 
 // A tiling's adjacency, and nothing else.
@@ -137,6 +144,8 @@ export const TILINGS: Partial<Record<Shape, Tiling>> = {
   [Shape.pentagonHalves]: hexagonHalves,
   [Shape.pentagonHouses]: houseRows,
   [Shape.pentagonSlab]: pairedSlab,
+  [Shape.pentagonEars]: type4Ears,
+  [Shape.pentagonFan]: type5Fan,
 };
 
 const topologies: Record<Shape, Topology> = {
@@ -153,6 +162,8 @@ const topologies: Record<Shape, Topology> = {
   ),
   [Shape.pentagonHouses]: topologyFromTiling(Shape.pentagonHouses, houseRows),
   [Shape.pentagonSlab]: topologyFromTiling(Shape.pentagonSlab, pairedSlab),
+  [Shape.pentagonEars]: topologyFromTiling(Shape.pentagonEars, type4Ears),
+  [Shape.pentagonFan]: topologyFromTiling(Shape.pentagonFan, type5Fan),
 };
 
 export function topologyFor(shape: Shape): Topology {

@@ -22,6 +22,30 @@ import {
   ShapeStateChangedEvent,
 } from "./ShapeEvents";
 import { ShapeGame } from "./ShapeGame";
+import { polygonArea, Recipe, searchArrangement } from "./arrange";
+import { solvePentagon, Spec } from "./pentagonShapes";
+
+// The two shapes whose geometry is solved rather than written down, with the
+// type each is meant to be and the arrangement the search found for it.
+const SOLVED_PENTAGONS: {
+  label: string;
+  spec: Spec;
+  want: number;
+  recipe: Recipe;
+}[] = [
+  {
+    label: "type 4 ears",
+    spec: (t, s) => ({ angles: [130, 90, 110, 90, 120], lengths: [t, 1, 1, s, s] }),
+    want: 4,
+    recipe: { kind: "turn", centre: { at: "corner", index: 1 }, order: 4 },
+  },
+  {
+    label: "type 5 fan",
+    spec: (t, s) => ({ angles: [60, 100, 150, 120, 110], lengths: [1, 1, s, t, t] }),
+    want: 5,
+    recipe: { kind: "turn", centre: { at: "corner", index: 0 }, order: 6 },
+  },
+];
 import { allShapes, Shape, shapeName } from "./Shape";
 import {
   chebyshevCenter,
@@ -821,6 +845,116 @@ console.log("\ntilings described as geometry\n");
       typeof NUMBER_COLORS[worst] === "string"
     );
   }
+}
+
+console.log("\narrangements searched for, not written down\n");
+
+{
+  // The two newest shapes do not carry their geometry: a pentagon is solved
+  // from its type's conditions and the arrangement is replayed from a recipe
+  // the search found. Both halves can rot, and differently.
+
+  // First, that the solved pentagons really are the types claimed -- and only
+  // those. A pentagon that also satisfies a neighbouring type's conditions
+  // still tiles, but it is not an instance of the type it is named for.
+  for (const { label, spec, want } of SOLVED_PENTAGONS) {
+    const cell = solvePentagon(spec);
+    check(`${label}: its conditions close into a convex pentagon`, cell !== undefined);
+    if (cell === undefined) continue;
+    const measured = typesOf(cell);
+    check(
+      `${label}: measures as type ${want} and nothing else`,
+      measured.length === 1 && measured[0] === want
+    );
+  }
+
+  // Second, that the recipe is still what the search finds. The recipe is
+  // written down because searching takes seconds and a page cannot wait; this
+  // is what stops it becoming a number nobody can re-derive.
+  for (const { label, spec, recipe } of SOLVED_PENTAGONS) {
+    const cell = solvePentagon(spec);
+    if (cell === undefined) continue;
+    const found = searchArrangement(cell);
+    check(`${label}: the search still finds an arrangement`, found !== undefined);
+    if (found === undefined) continue;
+    check(
+      `${label}: and it is the one written down (${found.how})`,
+      JSON.stringify(found.recipe) === JSON.stringify(recipe)
+    );
+  }
+
+  // Third, that the search is worth trusting at all: handed the cell of a
+  // tiling that was built by hand, it has to find a way to tile with it.
+  //
+  // What it must not be asked is to find the *same* way. A pentagon can tile
+  // the plane in more than one arrangement, and the house does: it is shipped
+  // as rows of two cells with six neighbours, and the search answers with a
+  // different, equally valid tiling of four cells with seven. Asserting the
+  // known degree here failed on exactly that, and the check was wrong rather
+  // than the search.
+  for (const { name, tiling } of pentagonTilings) {
+    const cell = tiling.unit[0].map((p) => ({ ...p }));
+    const found = searchArrangement(cell);
+    check(`${name}: the search recovers an arrangement for it`, found !== undefined);
+    if (found === undefined) continue;
+    check(
+      `${name}: built from the same cell`,
+      found.tiling.unit.every(
+        (c) => Math.abs(polygonArea(c) - polygonArea(cell)) < 1e-6
+      )
+    );
+    check(
+      `${name}: and it covers the plane`,
+      checkCoverage(found.tiling, Math.random, 4000).ok
+    );
+    const derived = deriveOffsets(found.tiling);
+    check(
+      `${name}: with adjacency that runs both ways`,
+      derived.every((row, index) =>
+        row.every((offset) =>
+          derived[offset.index].some(
+            (back) =>
+              back.index === index &&
+              back.dRow === -offset.dRow &&
+              back.dUnitColumn === -offset.dUnitColumn
+          )
+        )
+      )
+    );
+  }
+
+  // The house tiling two ways is worth pinning rather than leaving as a
+  // surprise: it is the reason the loop above cannot check a degree.
+  {
+    const house = pentagonTilings.find((t) => t.name === "house rows");
+    check(
+      "the house pentagon is shipped with six neighbours",
+      house !== undefined &&
+        Math.max(...deriveOffsets(house.tiling).map((o) => o.length)) === 6
+    );
+    const other =
+      house === undefined
+        ? undefined
+        : searchArrangement(house.tiling.unit[0].map((p) => ({ ...p })));
+    check(
+      "and tiles a second way, with seven",
+      other !== undefined &&
+        Math.max(...deriveOffsets(other.tiling).map((o) => o.length)) === 7
+    );
+  }
+
+  // And that it says no when the answer is no. A regular pentagon does not
+  // tile the plane -- that is why there are fifteen types and not sixteen --
+  // so the search must fail to arrange one.
+  const regular: Point[] = Array.from({ length: 5 }, (_unused, k) => ({
+    x: Math.cos((2 * Math.PI * k) / 5),
+    y: Math.sin((2 * Math.PI * k) / 5),
+  }));
+  check("a regular pentagon measures as no type at all", typesOf(regular).length === 0);
+  check(
+    "and the search refuses to arrange one",
+    searchArrangement(regular) === undefined
+  );
 }
 
 console.log("\nseparation from the square game\n");
