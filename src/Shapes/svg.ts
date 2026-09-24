@@ -3,7 +3,7 @@ import { Tile } from "../State/Tile";
 import { TileState } from "../State/TileState";
 import { WinLoseStatus } from "../State/WinLoseStatus";
 import { Board } from "./Board";
-import { layoutFor, GLYPH_OUTLINE_PX, Layout } from "./geometry";
+import { forBoard, layoutFor, GLYPH_OUTLINE_PX, Layout } from "./geometry";
 import { BOARD_FACE, colorForCount } from "./numberPalette";
 
 // Board markup as a string, with no DOM calls, so the same drawing runs in a
@@ -166,7 +166,11 @@ export function cellSvg(
 }
 
 export function boardSvg(board: Board, content: number): string {
-  const layout = layoutFor(board.info.shape, content);
+  const layout = forBoard(
+    layoutFor(board.info.shape, content),
+    board.info.rows,
+    board.info.cols
+  );
   const counts = board.nearbyBombCounts();
   const status = WinLoseStatus.none;
   const cells = board.tileArray

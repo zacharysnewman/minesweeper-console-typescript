@@ -15,6 +15,8 @@ export enum Shape {
   pentagonSlab,
   pentagonEars,
   pentagonFan,
+  pentagonGlide,
+  pentagonPairs,
 }
 
 const names: Record<Shape, string> = {
@@ -27,6 +29,8 @@ const names: Record<Shape, string> = {
   [Shape.pentagonSlab]: "pentagon (paired slab)",
   [Shape.pentagonEars]: "pentagon (type 4 ears)",
   [Shape.pentagonFan]: "pentagon (type 5 fan)",
+  [Shape.pentagonGlide]: "pentagon (type 2 glide)",
+  [Shape.pentagonPairs]: "pentagon (type 6 pairs)",
 };
 
 export function shapeName(shape: Shape): string {
@@ -43,6 +47,8 @@ export const allShapes: Shape[] = [
   Shape.pentagonSlab,
   Shape.pentagonEars,
   Shape.pentagonFan,
+  Shape.pentagonGlide,
+  Shape.pentagonPairs,
 ];
 
 // What a shape is called in the page's select, and in the URL. This lives
@@ -59,6 +65,8 @@ const options: Record<Shape, string> = {
   [Shape.pentagonSlab]: "pentagonSlab",
   [Shape.pentagonEars]: "pentagonEars",
   [Shape.pentagonFan]: "pentagonFan",
+  [Shape.pentagonGlide]: "pentagonGlide",
+  [Shape.pentagonPairs]: "pentagonPairs",
 };
 
 export function shapeOption(shape: Shape): string {

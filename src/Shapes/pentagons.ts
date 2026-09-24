@@ -182,31 +182,108 @@ function fromType(spec: Spec, recipe: Recipe): Tiling {
   return tiling;
 }
 
-// Type 4: b = c and d = e with B = D = 90. Two right-isosceles ears, and a
-// quarter turn about the vertex between one ear's equal sides carries one of
-// its sides onto the other -- so four copies close up around that corner, and
-// that is the whole arrangement. Four angles of 90 make 360 exactly.
-export const type4Ears: Tiling = fromType(
-  (t, s) => ({ angles: [130, 90, 110, 90, 120], lengths: [t, 1, 1, s, s] }),
-  { kind: "turn", centre: { at: "corner", index: 1 }, order: 4 }
-);
-
-// Type 5: a = b and d = e with A = 60 and D = 120. Six copies turned about
-// the 60 degree corner close around it, which is where its six-fold symmetry
-// comes from; squaring the lattice up then takes two rows of six.
+// The solved shapes, as one table.
 //
-// Twelve cells to a unit and eight neighbours -- the most crowded board here,
-// and the only one of these that beats the square's eight.
-export const type5Fan: Tiling = fromType(
-  (t, s) => ({ angles: [60, 100, 150, 120, 110], lengths: [1, 1, s, t, t] }),
-  { kind: "turn", centre: { at: "corner", index: 0 }, order: 6 }
-);
+// Each carries the conditions its pentagon is solved from and the recipe the
+// search found for it -- and nothing else, because a transcribed pentagon can
+// be wrong in a way that still looks like a pentagon. shapes:check reads this
+// same table, so the conditions cannot drift apart from what is checked.
+export interface SolvedPentagon {
+  readonly name: string;
+  // Which of the fifteen. The checks demand each one measure as this and
+  // nothing else, since a too-symmetric choice of the free parameters
+  // satisfies a neighbouring type's conditions too.
+  readonly type: number;
+  readonly spec: Spec;
+  readonly recipe: Recipe;
+}
 
-export const pentagonTilings: { name: string; tiling: Tiling }[] = [
-  { name: "hexagon thirds", tiling: hexagonThirds },
-  { name: "hexagon halves", tiling: hexagonHalves },
-  { name: "house rows", tiling: houseRows },
-  { name: "paired slab", tiling: pairedSlab },
-  { name: "type 4 ears", tiling: type4Ears },
-  { name: "type 5 fan", tiling: type5Fan },
+export const SOLVED_PENTAGONS: SolvedPentagon[] = [
+  // Its four cells are a single orbit, but the orbit is pgg: two of the four
+  // are turned over, so no arrangement of turns alone reaches it however long
+  // it is searched for. A half turn paired with a glide is the whole of what
+  // it needed.
+  {
+    name: "type 2 glide",
+    type: 2,
+    spec: (t, s) => ({ angles: [120, 100, 130, 80, 110], lengths: [t, 1, s, 1, s] }),
+    recipe: {
+      group: {
+        kind: "pgg",
+        centre: { at: "corner", index: 1 },
+        glide: { against: 0, baseEdge: 0, cellEdge: 2, flip: true, swap: true },
+      },
+      seeds: [],
+    },
+  },
+  // Two right-isosceles ears, from b = c and d = e with B = D = 90. A quarter
+  // turn about the corner between one ear's equal sides carries one onto the
+  // other, so four copies close up around it -- four right angles make 360
+  // exactly, and that is the whole arrangement.
+  {
+    name: "type 4 ears",
+    type: 4,
+    spec: (t, s) => ({ angles: [130, 90, 110, 90, 120], lengths: [t, 1, 1, s, s] }),
+    recipe: {
+      group: { kind: "cyclic", centre: { at: "corner", index: 1 }, order: 4 },
+      seeds: [],
+    },
+  },
+  // Six copies turned about the 60 degree corner close around it, which is
+  // where its six-fold symmetry comes from; squaring the lattice up then
+  // takes two rows of six.
+  //
+  // Twelve cells to a unit and eight neighbours -- the most crowded board
+  // here, and the only one of these that matches the square's eight.
+  {
+    name: "type 5 fan",
+    type: 5,
+    spec: (t, s) => ({ angles: [60, 100, 150, 120, 110], lengths: [1, 1, s, t, t] }),
+    recipe: {
+      group: { kind: "cyclic", centre: { at: "corner", index: 0 }, order: 6 },
+      seeds: [],
+    },
+  },
+  // p2, and four cells -- the same size the plain half-turn family builds --
+  // and still unreachable by it, because those four cells are *two* orbits
+  // rather than one. It is the clearest case for seeding the group with more
+  // than one cell: nothing about the group or the size was the obstacle.
+  {
+    name: "type 6 pairs",
+    type: 6,
+    spec: (t, s) => ({ angles: [200 - t, t, 160 - t, 180 - t, 2 * t], lengths: [1, s, s, 1, 1] }),
+    recipe: {
+      group: { kind: "cyclic", centre: { at: "edge", index: 1 }, order: 2 },
+      seeds: [{ against: 0, baseEdge: 0, cellEdge: 1, flip: false, swap: true }],
+    },
+  },
+];
+
+function solved(name: string): Tiling {
+  const entry = SOLVED_PENTAGONS.find((p) => p.name === name);
+  if (entry === undefined) {
+    throw new Error(`no solved pentagon called ${name}`);
+  }
+  return fromType(entry.spec, entry.recipe);
+}
+
+export const type2Glide: Tiling = solved("type 2 glide");
+export const type4Ears: Tiling = solved("type 4 ears");
+export const type5Fan: Tiling = solved("type 5 fan");
+export const type6Pairs: Tiling = solved("type 6 pairs");
+
+// Every pentagon board, with how many seed cells the search needs to find an
+// arrangement for it. That number is the tiling's orbit count, and it is
+// carried here because a check that searches for one of these has to be
+// allowed the seeds it takes -- type 6's cells are two orbits, and no search
+// from a single seed will ever arrange them.
+export const pentagonTilings: { name: string; tiling: Tiling; seeds: number }[] = [
+  { name: "hexagon thirds", tiling: hexagonThirds, seeds: 1 },
+  { name: "hexagon halves", tiling: hexagonHalves, seeds: 1 },
+  { name: "house rows", tiling: houseRows, seeds: 1 },
+  { name: "paired slab", tiling: pairedSlab, seeds: 1 },
+  { name: "type 2 glide", tiling: type2Glide, seeds: 1 },
+  { name: "type 4 ears", tiling: type4Ears, seeds: 1 },
+  { name: "type 5 fan", tiling: type5Fan, seeds: 1 },
+  { name: "type 6 pairs", tiling: type6Pairs, seeds: 2 },
 ];

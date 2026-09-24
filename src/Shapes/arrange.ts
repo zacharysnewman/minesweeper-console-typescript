@@ -4,16 +4,24 @@ import { checkCoverage, squareUp, Tiling } from "./Tiling";
 // Finding a tiling's arrangement, rather than looking it up.
 //
 // A type's conditions say what shape its pentagon is. They do not say how the
-// copies sit against each other, and that is what a board needs. The article
-// carries the arrangements in diagrams; this searches for them instead.
+// copies sit against each other, and that is what a board needs.
 //
-// Two facts make the search small. A primitive unit of a periodic tiling is
-// built by the isometries of its wallpaper group, and for these tilings that
-// means turns of order 2, 3, 4 or 6 about a corner or an edge midpoint. And
-// the lattice is pinned by area: whatever two vectors span it, the
+// A periodic tiling's primitive unit is the orbit of its tiles under the
+// symmetry group, so the search builds units the same way: take a symmetry
+// group, apply it to one or more seed cells, and look for a lattice. Two
+// numbers decide what a given type needs, and both come off the
+// classification:
+//
+//   orbits = tiles in the primitive unit / order of the point group
+//
+// The orbit count says how many seeds. The group says which family -- and
+// seven of the fifteen types are pgg, whose single orbit contains mirror
+// images that no rotation produces, so a family of turns alone reaches only
+// the four types that are isohedral *and* rotation-generated.
+//
+// The lattice is pinned by area: whatever two vectors span it, the
 // parallelogram they make has exactly the area of the unit. That turns a
-// search over vectors into a handful of candidates, each settled by the
-// coverage check.
+// search over vectors into a handful of candidates, each settled by coverage.
 
 const EPS = 1e-9;
 
@@ -25,57 +33,300 @@ export function polygonArea(polygon: readonly Point[]): number {
   return Math.abs(total) / 2;
 }
 
-function turn(polygon: readonly Point[], about: Point, radians: number): Point[] {
+// An isometry, as the six numbers of an affine map. Kept as a value rather
+// than as "the polygon that came out", because a group has to act on every
+// seed, not only on the one it was derived from.
+export type Motion = readonly [number, number, number, number, number, number];
+
+const IDENTITY: Motion = [1, 0, 0, 1, 0, 0];
+
+function applyTo(m: Motion, polygon: readonly Point[]): Point[] {
+  return polygon.map((p) => ({
+    x: m[0] * p.x + m[2] * p.y + m[4],
+    y: m[1] * p.x + m[3] * p.y + m[5],
+  }));
+}
+
+// first, then second.
+function compose(second: Motion, first: Motion): Motion {
+  return [
+    second[0] * first[0] + second[2] * first[1],
+    second[1] * first[0] + second[3] * first[1],
+    second[0] * first[2] + second[2] * first[3],
+    second[1] * first[2] + second[3] * first[3],
+    second[0] * first[4] + second[2] * first[5] + second[4],
+    second[1] * first[4] + second[3] * first[5] + second[5],
+  ];
+}
+
+function turnMotion(about: Point, radians: number): Motion {
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
-  return polygon.map((p) => {
-    const dx = p.x - about.x;
-    const dy = p.y - about.y;
-    return { x: about.x + dx * cos - dy * sin, y: about.y + dx * sin + dy * cos };
-  });
+  return [cos, sin, -sin, cos, about.x - cos * about.x + sin * about.y, about.y - sin * about.x - cos * about.y];
 }
 
-// Copies of a cell turned about one point, which is how a corner where k
-// equal angles meet gets filled.
-export function turnedUnit(
+function flipsOver(m: Motion): boolean {
+  return m[0] * m[3] - m[1] * m[2] < 0;
+}
+
+// Where a turn is centred: a corner, or the middle of an edge.
+export interface Centre {
+  readonly at: "corner" | "edge";
+  readonly index: number;
+}
+
+function centreOf(cell: readonly Point[], centre: Centre): Point {
+  const p = cell[centre.index];
+  if (centre.at === "corner") return p;
+  const q = cell[(centre.index + 1) % cell.length];
+  return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+}
+
+function turnCentres(cell: readonly Point[]): { centre: Centre; name: string }[] {
+  const spots: { centre: Centre; name: string }[] = [];
+  cell.forEach((_unused, i) => spots.push({ centre: { at: "corner", index: i }, name: `corner ${i}` }));
+  cell.forEach((_unused, i) => spots.push({ centre: { at: "edge", index: i }, name: `edge ${i} midpoint` }));
+  return spots;
+}
+
+// Laying one cell against another: which edge of each touches, which ends
+// meet, and whether the copy is turned over. Lengths need not match, because
+// most of the fifteen types are not edge to edge and a copy's edge runs part
+// way along its neighbour's.
+export interface Placement {
+  // Which already-placed cell to lay this one against; 0 is the seed itself.
+  readonly against: number;
+  readonly baseEdge: number;
+  readonly cellEdge: number;
+  readonly flip: boolean;
+  readonly swap: boolean;
+}
+
+function placementMotion(
   cell: readonly Point[],
-  about: Point,
-  order: number
-): Point[][] {
-  return Array.from({ length: order }, (_unused, k) =>
-    turn(cell, about, (2 * Math.PI * k) / order)
-  );
+  against: readonly Point[],
+  placement: Placement
+): Motion | undefined {
+  const n = cell.length;
+  const p0 = against[placement.baseEdge];
+  const p1 = against[(placement.baseEdge + 1) % n];
+  const q0 = cell[placement.cellEdge];
+  const q1 = cell[(placement.cellEdge + 1) % n];
+
+  const from0 = placement.flip ? q1 : q0;
+  const from1 = placement.flip ? q0 : q1;
+  const to0 = placement.swap ? p1 : p0;
+  const to1 = placement.swap ? p0 : p1;
+
+  const fa = Math.atan2(from1.y - from0.y, from1.x - from0.x);
+  const ta = Math.atan2(to1.y - to0.y, to1.x - to0.x);
+  if (!isFinite(fa) || !isFinite(ta)) return undefined;
+
+  // Turn the copy's edge onto the line of the base's, anchored at one end,
+  // having first turned it over if that is what this placement is.
+  const mirror: Motion = placement.flip ? [1, 0, 0, -1, 0, 0] : IDENTITY;
+  const toOrigin: Motion = [1, 0, 0, 1, -from0.x, -from0.y];
+  const rot = turnMotion({ x: 0, y: 0 }, ta - (placement.flip ? -fa : fa));
+  const back: Motion = [1, 0, 0, 1, to0.x, to0.y];
+  return compose(back, compose(rot, compose(mirror, toOrigin)));
 }
 
-// Turns alone do not reach every arrangement: several of the fifteen types
-// tile by glide reflection, where a copy is flipped as well as moved, and no
-// rotation of the cell will stand in for it. Reflecting across the line an
-// edge lies on is where a flipped copy sits in these tilings.
-export function mirroredAcrossEdge(cell: readonly Point[], edge: number): Point[] {
-  const a = cell[edge];
-  const b = cell[(edge + 1) % cell.length];
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const len = Math.hypot(dx, dy);
-  if (len < EPS) return cell.map((p) => ({ ...p }));
-  const ux = dx / len;
-  const uy = dy / len;
-  return cell.map((p) => {
-    const vx = p.x - a.x;
-    const vy = p.y - a.y;
-    // Reflect v in the direction u.
-    const along = vx * ux + vy * uy;
-    const rx = 2 * along * ux - vx;
-    const ry = 2 * along * uy - vy;
-    return { x: a.x + rx, y: a.y + ry };
-  });
+function allPlacements(cellLength: number, against: number): Placement[] {
+  const out: Placement[] = [];
+  for (let baseEdge = 0; baseEdge < cellLength; baseEdge++) {
+    for (let cellEdge = 0; cellEdge < cellLength; cellEdge++) {
+      for (const flip of [false, true]) {
+        for (const swap of [false, true]) {
+          out.push({ against, baseEdge, cellEdge, flip, swap });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// The symmetry group a unit is built with. Turns about one centre give the
+// cyclic groups -- p1, p2, p3, p4, p6 -- and a half turn paired with a glide
+// gives pgg, whose four elements include two that turn the cell over.
+export type Group =
+  | { readonly kind: "cyclic"; readonly centre: Centre; readonly order: number }
+  | { readonly kind: "pgg"; readonly centre: Centre; readonly glide: Placement };
+
+function groupMotions(cell: readonly Point[], group: Group): Motion[] | undefined {
+  if (group.kind === "cyclic") {
+    const about = centreOf(cell, group.centre);
+    return Array.from({ length: group.order }, (_unused, k) =>
+      turnMotion(about, (2 * Math.PI * k) / group.order)
+    );
+  }
+  const glide = placementMotion(cell, cell, group.glide);
+  if (glide === undefined || !flipsOver(glide)) return undefined;
+  const half = turnMotion(centreOf(cell, group.centre), Math.PI);
+  return [IDENTITY, half, glide, compose(half, glide)];
+}
+
+// How an arrangement was built, in a form that can be replayed. Searching for
+// one takes seconds, which is no use at page load; replaying takes
+// milliseconds, and shapes:check runs the search again to confirm the recipe
+// still describes what it finds.
+export interface Recipe {
+  readonly group: Group;
+  // Seed cells beyond the first, for the types whose tiles fall into more
+  // than one orbit and whose unit therefore cannot be any one cell's.
+  readonly seeds: readonly Placement[];
+}
+
+export interface Arrangement {
+  readonly tiling: Tiling;
+  readonly how: string;
+  readonly recipe: Recipe;
+}
+
+function seedCells(cell: Point[], seeds: readonly Placement[]): Point[][] | undefined {
+  const placed: Point[][] = [cell];
+  for (const seed of seeds) {
+    if (seed.against >= placed.length) return undefined;
+    const motion = placementMotion(cell, placed[seed.against], seed);
+    if (motion === undefined) return undefined;
+    placed.push(applyTo(motion, cell));
+  }
+  return placed;
+}
+
+export function buildArrangement(cell: Point[], recipe: Recipe): Tiling | undefined {
+  const unit = unitFor(cell, recipe);
+  if (unit === undefined) return undefined;
+  const found = findLattice(unit, latticeOffsets(cell, unit));
+  return found === undefined ? undefined : squareUp(found);
+}
+
+function unitFor(cell: Point[], recipe: Recipe): Point[][] | undefined {
+  const seeds = seedCells(cell, recipe.seeds);
+  if (seeds === undefined) return undefined;
+  const motions = groupMotions(cell, recipe.group);
+  if (motions === undefined) return undefined;
+  const unit = seeds.flatMap((seed) => motions.map((m) => applyTo(m, seed)));
+  return overlapping(unit) ? undefined : unit;
+}
+
+export interface SearchLimits {
+  // The search is exhaustive over its families and that is a lot of units at
+  // three seeds, so callers that only want the cheap answers can stop early.
+  readonly maxSeeds?: number;
+  readonly milliseconds?: number;
+}
+
+export function searchArrangement(
+  cell: Point[],
+  limits: SearchLimits = {}
+): Arrangement | undefined {
+  const maxSeeds = limits.maxSeeds !== undefined ? limits.maxSeeds : 3;
+  const deadline = Date.now() + (limits.milliseconds !== undefined ? limits.milliseconds : 120000);
+  const spots = turnCentres(cell);
+  const groups = candidateGroups(cell, spots);
+
+  // Fewest seeds first, so a tiling that needs only one is never given two.
+  for (let seedCount = 1; seedCount <= maxSeeds; seedCount++) {
+    for (const seeds of seedSets(cell, seedCount)) {
+      for (const { group, name } of groups) {
+        if (Date.now() > deadline) return undefined;
+        const recipe: Recipe = { group, seeds };
+        const unit = unitFor(cell, recipe);
+        if (unit === undefined) continue;
+        const found = findLattice(unit, latticeOffsets(cell, unit));
+        if (found !== undefined) {
+          const seedNote = seedCount === 1 ? "" : ` on ${seedCount} seed cells`;
+          return { tiling: squareUp(found), how: `${name}${seedNote}`, recipe };
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
+function candidateGroups(
+  cell: readonly Point[],
+  spots: { centre: Centre; name: string }[]
+): { group: Group; name: string }[] {
+  const out: { group: Group; name: string }[] = [];
+  // Turns first: they are cheaper and they are what the isohedral,
+  // rotation-generated types need.
+  for (const order of [2, 3, 4, 6]) {
+    for (const spot of spots) {
+      out.push({
+        group: { kind: "cyclic", centre: spot.centre, order },
+        name: `${order} copies turned about ${spot.name}`,
+      });
+    }
+  }
+  // Then the reflecting family. Only placements that turn the cell over can
+  // be the glide, and two that act identically are one candidate.
+  const seen = new Set<string>();
+  for (const placement of allPlacements(cell.length, 0)) {
+    if (!placement.flip) continue;
+    const motion = placementMotion(cell, cell, placement);
+    if (motion === undefined || !flipsOver(motion)) continue;
+    const key = motion.map((v) => v.toFixed(6)).join(",");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    for (const spot of spots) {
+      out.push({
+        group: { kind: "pgg", centre: spot.centre, glide: placement },
+        name: `a half turn about ${spot.name} with a flip across edge ${placement.baseEdge}`,
+      });
+    }
+  }
+  out.push({ group: { kind: "cyclic", centre: { at: "corner", index: 0 }, order: 1 }, name: "translations alone" });
+  return out;
+}
+
+// Seed sets, as placements against cells already seeded. Sets whose cells
+// overlap are dropped here rather than after a group has been applied to
+// them, which is most of them.
+function seedSets(cell: Point[], count: number): Placement[][] {
+  if (count === 1) return [[]];
+  let sets: Placement[][] = [[]];
+  for (let depth = 1; depth < count; depth++) {
+    const next: Placement[][] = [];
+    for (const set of sets) {
+      const placed = seedCells(cell, set);
+      if (placed === undefined) continue;
+      for (let against = 0; against < placed.length; against++) {
+        for (const placement of allPlacements(cell.length, against)) {
+          const motion = placementMotion(cell, placed[against], placement);
+          if (motion === undefined) continue;
+          const candidate = applyTo(motion, cell);
+          if (placed.some((other) => convexOverlap(other, candidate))) continue;
+          next.push([...set, placement]);
+        }
+      }
+    }
+    sets = dedupe(cell, next);
+  }
+  return sets;
+}
+
+function dedupe(cell: Point[], sets: Placement[][]): Placement[][] {
+  const seen = new Set<string>();
+  const out: Placement[][] = [];
+  for (const set of sets) {
+    const placed = seedCells(cell, set);
+    if (placed === undefined) continue;
+    const key = placed
+      .map((c) => {
+        const m = centre(c);
+        return `${m.x.toFixed(5)},${m.y.toFixed(5)}`;
+      })
+      .sort()
+      .join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(set);
+  }
+  return out;
 }
 
 // The two vectors that carry a unit across the plane.
-//
-// Candidates come from the geometry itself -- the differences between corners
-// of the unit -- and the pair has to span exactly the unit's area, which
-// discards almost everything before any coverage test runs.
 export function findLattice(unit: Point[][], extra: Point[] = []): Tiling | undefined {
   const target = unit.reduce((sum, cell) => sum + polygonArea(cell), 0);
   const corners = unit.flat();
@@ -85,9 +336,7 @@ export function findLattice(unit: Point[][], extra: Point[] = []): Tiling | unde
     const size = Math.hypot(v.x, v.y);
     if (size < EPS) return;
     // One of each opposite pair is enough.
-    const signed = v.x < -EPS || (Math.abs(v.x) < EPS && v.y < 0)
-      ? { x: -v.x, y: -v.y }
-      : v;
+    const signed = v.x < -EPS || (Math.abs(v.x) < EPS && v.y < 0) ? { x: -v.x, y: -v.y } : v;
     const k = `${signed.x.toFixed(6)},${signed.y.toFixed(6)}`;
     if (seen.has(k)) return;
     seen.add(k);
@@ -121,8 +370,8 @@ export function findLattice(unit: Point[][], extra: Point[] = []): Tiling | unde
         cells: unit.length,
         across,
         down,
-        // Cells are drawn where they were grown, which may be several lattice
-        // steps from the origin; the coverage check only translates a fixed
+        // Cells sit where they were built, which may be several lattice steps
+        // from the origin; the coverage check only translates a fixed
         // distance, so bring each one home first.
         unit: unit.map((cell) => intoDomain(cell, across, down)),
       };
@@ -155,188 +404,6 @@ function seeded(seed: number): () => number {
   };
 }
 
-// Where a turn can be centred: a corner, or the middle of an edge.
-//
-// Widening this to the points an edge is divided at by the other edges'
-// lengths -- where a copy's corner lands in a tiling that is not edge to edge
-// -- was tried and found nothing those two do not already reach, at three
-// times the running time. What the remaining types need is not another centre
-// but a glide, below.
-interface Spot {
-  readonly at: Point;
-  readonly name: string;
-  readonly centre: Centre;
-}
-
-function turnCentres(cell: readonly Point[]): Spot[] {
-  const spots: Spot[] = [];
-  cell.forEach((p, i) =>
-    spots.push({ at: p, name: `corner ${i}`, centre: { at: "corner", index: i } })
-  );
-  cell.forEach((p, i) => {
-    const q = cell[(i + 1) % cell.length];
-    spots.push({
-      at: { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 },
-      name: `edge ${i} midpoint`,
-      centre: { at: "edge", index: i },
-    });
-  });
-  return spots;
-}
-
-// What this search does not reach.
-//
-// Glide reflections were built and tried -- flip across an edge's line, then
-// slide along it by one of the distances between corners, which are the only
-// slides at which a flipped copy sits against its original. They found
-// nothing, at eight times the running time, so they are not here.
-//
-// The limit is more likely the size of the unit than the moves. Every family
-// below is one turn, or two half turns: units of 2, 3, 4 or 6 cells. Several
-// of the fifteen types have primitive units of 8, 12 or 18, which take more
-// generators composed than this search composes.
-
-// Where a turn is centred, named so it survives being written down.
-export interface Centre {
-  readonly at: "corner" | "edge";
-  readonly index: number;
-}
-
-// How an arrangement was built, in a form that can be replayed. Searching for
-// one takes tens of seconds, which is no use at page load; replaying the
-// recipe takes milliseconds, and shapes:check runs the search again to
-// confirm the recipe still describes what the search finds.
-export type Recipe =
-  | { readonly kind: "turn"; readonly centre: Centre; readonly order: number }
-  | { readonly kind: "halfTurns"; readonly first: Centre; readonly second: Centre };
-
-export interface Arrangement {
-  readonly tiling: Tiling;
-  // How it was found, so a shipped tiling can say where it came from.
-  readonly how: string;
-  readonly recipe: Recipe;
-}
-
-function centreOf(cell: readonly Point[], centre: Centre): Point {
-  const p = cell[centre.index];
-  if (centre.at === "corner") return p;
-  const q = cell[(centre.index + 1) % cell.length];
-  return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
-}
-
-export function buildArrangement(cell: Point[], recipe: Recipe): Tiling | undefined {
-  if (recipe.kind === "turn") {
-    const unit = turnedUnit(cell, centreOf(cell, recipe.centre), recipe.order);
-    if (overlapping(unit)) return undefined;
-    const found = findLattice(unit, latticeOffsets(cell, unit));
-    return found === undefined ? undefined : squareUp(found);
-  }
-  const c1 = centreOf(cell, recipe.first);
-  const c2 = centreOf(cell, recipe.second);
-  const half = (poly: readonly Point[]): Point[] => turn(poly, c1, Math.PI);
-  const other = (poly: readonly Point[]): Point[] => turn(poly, c2, Math.PI);
-  const unit = [cell, half(cell), other(cell), other(half(cell))];
-  if (overlapping(unit)) return undefined;
-  const found = findLattice(unit, [{ x: 2 * (c2.x - c1.x), y: 2 * (c2.y - c1.y) }]);
-  return found === undefined ? undefined : squareUp(found);
-}
-
-// Try the turns a pentagon tiling's symmetry can be built from, and keep the
-// first that covers the plane. Corners first, then edge midpoints, and lower
-// orders first, because a smaller unit makes a better board.
-export function searchArrangement(cell: Point[]): Arrangement | undefined {
-  const spots = turnCentres(cell);
-
-  for (const order of [2, 3, 4, 6]) {
-    for (const spot of spots) {
-      const unit = turnedUnit(cell, spot.at, order);
-      // Turns that put copies on top of each other are not arrangements.
-      if (overlapping(unit)) continue;
-      const found = findLattice(unit, latticeOffsets(cell, unit));
-      if (found !== undefined) {
-        return {
-          tiling: squareUp(found),
-          how: `${order} copies turned about ${spot.name}`,
-          recipe: { kind: "turn", centre: spot.centre, order },
-        };
-      }
-    }
-  }
-  return undefined;
-}
-
-// Growing a unit by laying cells against each other.
-//
-// Turns about a point reach the arrangements built from rotations, and that
-// is not all of them: several types tile by glide reflection, and most of the
-// fifteen are not edge to edge, so a copy's edge lands part way along its
-// neighbour's rather than matching it end to end. Both are covered by the one
-// move a person makes with physical tiles -- slide a copy up against an edge,
-// either way round, lined up at one end -- so the search makes that move and
-// looks for a lattice after each one.
-
-interface Placed {
-  readonly cells: Point[][];
-  readonly how: string;
-}
-
-// Every way to lay a copy of the cell against one edge of a placed cell:
-// which edge of the copy touches, which ends meet, and whether it is flipped.
-function placementsAgainst(cell: readonly Point[], against: readonly Point[]): Point[][] {
-  const out: Point[][] = [];
-  const n = cell.length;
-  for (let i = 0; i < n; i++) {
-    const p0 = against[i];
-    const p1 = against[(i + 1) % n];
-    for (let j = 0; j < n; j++) {
-      const q0 = cell[j];
-      const q1 = cell[(j + 1) % n];
-      for (const flip of [false, true]) {
-        for (const swap of [false, true]) {
-          // Take the copy's edge j onto the line of edge i, anchored at one end.
-          const from0 = flip ? q1 : q0;
-          const from1 = flip ? q0 : q1;
-          const to0 = swap ? p1 : p0;
-          const to1 = swap ? p0 : p1;
-          const moved = alignEdge(cell, from0, from1, to0, to1, flip);
-          if (moved !== undefined) out.push(moved);
-        }
-      }
-    }
-  }
-  return out;
-}
-
-// Rigid motion (with a flip when asked) carrying from0 to to0 and pointing
-// from1 along to1. Lengths need not match: the copy's edge may run part way
-// along its neighbour's, which is what a non-edge-to-edge tiling does.
-function alignEdge(
-  cell: readonly Point[],
-  from0: Point,
-  from1: Point,
-  to0: Point,
-  to1: Point,
-  flip: boolean
-): Point[] | undefined {
-  const fx = from1.x - from0.x;
-  const fy = from1.y - from0.y;
-  const tx = to1.x - to0.x;
-  const ty = to1.y - to0.y;
-  const fl = Math.hypot(fx, fy);
-  const tl = Math.hypot(tx, ty);
-  if (fl < EPS || tl < EPS) return undefined;
-  const fa = Math.atan2(fy, fx);
-  const ta = Math.atan2(ty, tx);
-  const rot = ta - (flip ? -fa : fa);
-  const cos = Math.cos(rot);
-  const sin = Math.sin(rot);
-  return cell.map((p) => {
-    const vx = p.x - from0.x;
-    const vy = flip ? -(p.y - from0.y) : p.y - from0.y;
-    return { x: to0.x + vx * cos - vy * sin, y: to0.y + vx * sin + vy * cos };
-  });
-}
-
 // Is b a copy of a that has only been moved -- not turned, not flipped?
 function translationBetween(a: readonly Point[], b: readonly Point[]): Point | undefined {
   const v = { x: b[0].x - a[0].x, y: b[0].y - a[0].y };
@@ -352,7 +419,10 @@ function translationBetween(a: readonly Point[], b: readonly Point[]): Point | u
 function latticeOffsets(cell: readonly Point[], unit: readonly Point[][]): Point[] {
   const out: Point[] = [];
   for (const base of unit) {
-    for (const placed of placementsAgainst(cell, base)) {
+    for (const placement of allPlacements(cell.length, 0)) {
+      const motion = placementMotion(cell, base, placement);
+      if (motion === undefined) continue;
+      const placed = applyTo(motion, cell);
       for (const home of unit) {
         const v = translationBetween(home, placed);
         if (v !== undefined) out.push(v);
@@ -362,40 +432,9 @@ function latticeOffsets(cell: readonly Point[], unit: readonly Point[][]): Point
   return out;
 }
 
-function unitKey(cells: readonly Point[][]): string {
-  return cells
-    .map((c) => {
-      const m = centre(c);
-      return `${m.x.toFixed(5)},${m.y.toFixed(5)}`;
-    })
-    .sort()
-    .join("|");
-}
-
-// A primitive unit is compact, so when the frontier has to be trimmed, keep
-// the units whose cells sit closest together.
-function spread(cells: readonly Point[][]): number {
-  const mids = cells.map(centre);
-  const cx = mids.reduce((s, p) => s + p.x, 0) / mids.length;
-  const cy = mids.reduce((s, p) => s + p.y, 0) / mids.length;
-  return mids.reduce((s, p) => s + Math.hypot(p.x - cx, p.y - cy), 0);
-}
-
-// Laying cells against each other and looking for a lattice after each one
-// reaches arrangements the turn families do not -- it found type 4's unit
-// without being told to turn about a corner. It is not here because it takes
-// forty seconds to do so, and because what it found, the turn families found
-// in a form that can be written down and replayed. If a type turns up that
-// needs it, it is a breadth-first search over placementsAgainst.
-
 // Do two cells of a proposed unit share any area? Cells are convex, so a
 // separating axis settles it exactly, and a shared edge separates rather than
 // overlaps -- which is the whole point, since that is how they are laid.
-//
-// A centroid-in-polygon test is not enough here: two cells can overlap with
-// neither centre inside the other, and a unit of near-coincident cells is the
-// most compact thing the search can build, so it would crowd out the real
-// arrangement before it was ever tried.
 function overlapping(unit: readonly Point[][]): boolean {
   for (let i = 0; i < unit.length; i++) {
     for (let j = i + 1; j < unit.length; j++) {
@@ -415,7 +454,6 @@ function separated(a: readonly Point[], b: readonly Point[]): boolean {
   for (let i = 0; i < a.length; i++) {
     const p = a[i];
     const q = a[(i + 1) % a.length];
-    // Outward normal of this edge, for whichever way the outline is wound.
     const nx = q.y - p.y;
     const ny = -(q.x - p.x);
     const len = Math.hypot(nx, ny);

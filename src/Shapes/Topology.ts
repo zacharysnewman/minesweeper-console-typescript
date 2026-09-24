@@ -5,8 +5,10 @@ import {
   hexagonThirds,
   houseRows,
   pairedSlab,
+  type2Glide,
   type4Ears,
   type5Fan,
+  type6Pairs,
 } from "./pentagons";
 import { addressOf, columnOf, deriveOffsets, Tiling } from "./Tiling";
 
@@ -146,6 +148,8 @@ export const TILINGS: Partial<Record<Shape, Tiling>> = {
   [Shape.pentagonSlab]: pairedSlab,
   [Shape.pentagonEars]: type4Ears,
   [Shape.pentagonFan]: type5Fan,
+  [Shape.pentagonGlide]: type2Glide,
+  [Shape.pentagonPairs]: type6Pairs,
 };
 
 const topologies: Record<Shape, Topology> = {
@@ -164,6 +168,8 @@ const topologies: Record<Shape, Topology> = {
   [Shape.pentagonSlab]: topologyFromTiling(Shape.pentagonSlab, pairedSlab),
   [Shape.pentagonEars]: topologyFromTiling(Shape.pentagonEars, type4Ears),
   [Shape.pentagonFan]: topologyFromTiling(Shape.pentagonFan, type5Fan),
+  [Shape.pentagonGlide]: topologyFromTiling(Shape.pentagonGlide, type2Glide),
+  [Shape.pentagonPairs]: topologyFromTiling(Shape.pentagonPairs, type6Pairs),
 };
 
 export function topologyFor(shape: Shape): Topology {

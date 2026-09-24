@@ -22,30 +22,9 @@ import {
   ShapeStateChangedEvent,
 } from "./ShapeEvents";
 import { ShapeGame } from "./ShapeGame";
-import { polygonArea, Recipe, searchArrangement } from "./arrange";
-import { solvePentagon, Spec } from "./pentagonShapes";
+import { polygonArea, searchArrangement } from "./arrange";
+import { solvePentagon } from "./pentagonShapes";
 
-// The two shapes whose geometry is solved rather than written down, with the
-// type each is meant to be and the arrangement the search found for it.
-const SOLVED_PENTAGONS: {
-  label: string;
-  spec: Spec;
-  want: number;
-  recipe: Recipe;
-}[] = [
-  {
-    label: "type 4 ears",
-    spec: (t, s) => ({ angles: [130, 90, 110, 90, 120], lengths: [t, 1, 1, s, s] }),
-    want: 4,
-    recipe: { kind: "turn", centre: { at: "corner", index: 1 }, order: 4 },
-  },
-  {
-    label: "type 5 fan",
-    spec: (t, s) => ({ angles: [60, 100, 150, 120, 110], lengths: [1, 1, s, t, t] }),
-    want: 5,
-    recipe: { kind: "turn", centre: { at: "corner", index: 0 }, order: 6 },
-  },
-];
 import { allShapes, Shape, shapeName } from "./Shape";
 import {
   chebyshevCenter,
@@ -66,7 +45,7 @@ import {
   rotateTiling,
   Tiling,
 } from "./Tiling";
-import { pentagonTilings } from "./pentagons";
+import { pentagonTilings, SOLVED_PENTAGONS } from "./pentagons";
 import { PENTAGON_TYPES, typesOf } from "./pentagonTypes";
 import { TILINGS, topologyFor } from "./Topology";
 import { layoutFor as layoutForShape } from "./geometry";
@@ -857,7 +836,7 @@ console.log("\narrangements searched for, not written down\n");
   // First, that the solved pentagons really are the types claimed -- and only
   // those. A pentagon that also satisfies a neighbouring type's conditions
   // still tiles, but it is not an instance of the type it is named for.
-  for (const { label, spec, want } of SOLVED_PENTAGONS) {
+  for (const { name: label, spec, type: want } of SOLVED_PENTAGONS) {
     const cell = solvePentagon(spec);
     check(`${label}: its conditions close into a convex pentagon`, cell !== undefined);
     if (cell === undefined) continue;
@@ -871,10 +850,13 @@ console.log("\narrangements searched for, not written down\n");
   // Second, that the recipe is still what the search finds. The recipe is
   // written down because searching takes seconds and a page cannot wait; this
   // is what stops it becoming a number nobody can re-derive.
-  for (const { label, spec, recipe } of SOLVED_PENTAGONS) {
+  for (const { name: label, spec, recipe } of SOLVED_PENTAGONS) {
     const cell = solvePentagon(spec);
     if (cell === undefined) continue;
-    const found = searchArrangement(cell);
+    // Held to the recipe's own seed count. A search allowed more seeds than
+    // the answer needs would take minutes, and would also accept a worse
+    // arrangement than the one being checked for.
+    const found = searchArrangement(cell, { maxSeeds: recipe.seeds.length + 1 });
     check(`${label}: the search still finds an arrangement`, found !== undefined);
     if (found === undefined) continue;
     check(
@@ -892,9 +874,11 @@ console.log("\narrangements searched for, not written down\n");
   // different, equally valid tiling of four cells with seven. Asserting the
   // known degree here failed on exactly that, and the check was wrong rather
   // than the search.
-  for (const { name, tiling } of pentagonTilings) {
+  for (const { name, tiling, seeds } of pentagonTilings) {
     const cell = tiling.unit[0].map((p) => ({ ...p }));
-    const found = searchArrangement(cell);
+    // Allowed the seeds that tiling's orbit count needs, and no more: this is
+    // a check that the search works, not a hunt for a smaller arrangement.
+    const found = searchArrangement(cell, { maxSeeds: seeds });
     check(`${name}: the search recovers an arrangement for it`, found !== undefined);
     if (found === undefined) continue;
     check(
@@ -935,7 +919,7 @@ console.log("\narrangements searched for, not written down\n");
     const other =
       house === undefined
         ? undefined
-        : searchArrangement(house.tiling.unit[0].map((p) => ({ ...p })));
+        : searchArrangement(house.tiling.unit[0].map((p) => ({ ...p })), { maxSeeds: 1 });
     check(
       "and tiles a second way, with seven",
       other !== undefined &&
@@ -953,7 +937,7 @@ console.log("\narrangements searched for, not written down\n");
   check("a regular pentagon measures as no type at all", typesOf(regular).length === 0);
   check(
     "and the search refuses to arrange one",
-    searchArrangement(regular) === undefined
+    searchArrangement(regular, { maxSeeds: 2, milliseconds: 60000 }) === undefined
   );
 }
 

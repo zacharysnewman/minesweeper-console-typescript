@@ -92,6 +92,22 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(4, 84, 52, Shape.pentagonFan),
     expert: new BoardInfo(5, 96, 99, Shape.pentagonFan),
   },
+  // Type 2's unit is nearly twice as tall as it is wide, so a board that is
+  // square on screen runs about seven columns per row. Seven neighbours.
+  [Shape.pentagonGlide]: {
+    beginner: new BoardInfo(5, 36, 25, Shape.pentagonGlide),
+    intermediate: new BoardInfo(6, 44, 47, Shape.pentagonGlide),
+    expert: new BoardInfo(8, 56, 105, Shape.pentagonGlide),
+  },
+  // Type 6's lattice leans: its row step carries a third of a column
+  // sideways, and the drift is not a simple enough fraction for squareUp to
+  // stack it away, so the board is a parallelogram rather than a rectangle.
+  // Seven neighbours.
+  [Shape.pentagonPairs]: {
+    beginner: new BoardInfo(6, 32, 27, Shape.pentagonPairs),
+    intermediate: new BoardInfo(8, 40, 57, Shape.pentagonPairs),
+    expert: new BoardInfo(10, 52, 122, Shape.pentagonPairs),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];
