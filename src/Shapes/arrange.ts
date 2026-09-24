@@ -65,6 +65,15 @@ function turnMotion(about: Point, radians: number): Motion {
   return [cos, sin, -sin, cos, about.x - cos * about.x + sin * about.y, about.y - sin * about.x - cos * about.y];
 }
 
+function invert(m: Motion): Motion {
+  const det = m[0] * m[3] - m[1] * m[2];
+  const a = m[3] / det;
+  const b = -m[1] / det;
+  const c = -m[2] / det;
+  const d = m[0] / det;
+  return [a, b, c, d, -(a * m[4] + c * m[5]), -(b * m[4] + d * m[5])];
+}
+
 function flipsOver(m: Motion): boolean {
   return m[0] * m[3] - m[1] * m[2] < 0;
 }
@@ -100,6 +109,13 @@ export interface Placement {
   readonly cellEdge: number;
   readonly flip: boolean;
   readonly swap: boolean;
+  // How far to slide the copy along the edge after lining it up, as the
+  // length of one of the cell's own edges. Most of the fifteen types are not
+  // edge to edge: a copy's corner lands part way along its neighbour's edge,
+  // at a distance set by whichever edge of the neighbour ends there. Without
+  // this the only positions reachable are the ones where corners coincide,
+  // and a tiling that never does them is unreachable.
+  readonly slide?: { readonly edge: number; readonly sign: 1 | -1 };
 }
 
 function placementMotion(
@@ -127,7 +143,19 @@ function placementMotion(
   const mirror: Motion = placement.flip ? [1, 0, 0, -1, 0, 0] : IDENTITY;
   const toOrigin: Motion = [1, 0, 0, 1, -from0.x, -from0.y];
   const rot = turnMotion({ x: 0, y: 0 }, ta - (placement.flip ? -fa : fa));
-  const back: Motion = [1, 0, 0, 1, to0.x, to0.y];
+
+  let ox = to0.x;
+  let oy = to0.y;
+  if (placement.slide !== undefined) {
+    const along = Math.hypot(to1.x - to0.x, to1.y - to0.y);
+    if (along < EPS) return undefined;
+    const u = cell[placement.slide.edge];
+    const v = cell[(placement.slide.edge + 1) % n];
+    const by = Math.hypot(v.x - u.x, v.y - u.y) * placement.slide.sign;
+    ox += ((to1.x - to0.x) / along) * by;
+    oy += ((to1.y - to0.y) / along) * by;
+  }
+  const back: Motion = [1, 0, 0, 1, ox, oy];
   return compose(back, compose(rot, compose(mirror, toOrigin)));
 }
 
@@ -139,6 +167,21 @@ function allPlacements(cellLength: number, against: number): Placement[] {
         for (const swap of [false, true]) {
           out.push({ against, baseEdge, cellEdge, flip, swap });
         }
+      }
+    }
+  }
+  return out;
+}
+
+// The same, plus the slid positions. Kept separate because the group
+// families do not need them and there are eleven times as many.
+function allPlacementsWithSlides(cellLength: number, against: number): Placement[] {
+  const out: Placement[] = [];
+  for (const placement of allPlacements(cellLength, against)) {
+    out.push(placement);
+    for (let edge = 0; edge < cellLength; edge++) {
+      for (const sign of [1, -1] as const) {
+        out.push({ ...placement, slide: { edge, sign } });
       }
     }
   }
@@ -169,12 +212,19 @@ function groupMotions(cell: readonly Point[], group: Group): Motion[] | undefine
 // one takes seconds, which is no use at page load; replaying takes
 // milliseconds, and shapes:check runs the search again to confirm the recipe
 // still describes what it finds.
-export interface Recipe {
-  readonly group: Group;
-  // Seed cells beyond the first, for the types whose tiles fall into more
-  // than one orbit and whose unit therefore cannot be any one cell's.
-  readonly seeds: readonly Placement[];
-}
+export type Recipe =
+  | {
+      readonly kind: "orbit";
+      readonly group: Group;
+      // Seed cells beyond the first, for the types whose tiles fall into more
+      // than one orbit and whose unit therefore cannot be any one cell's.
+      readonly seeds: readonly Placement[];
+    }
+  // A patch laid one cell at a time, for the tilings no group family reaches.
+  // A k-isohedral tiling's rotation centres need not sit on the cell at all,
+  // so there is nothing to enumerate; what can be done instead is to tile,
+  // the way a person would, and then measure the periodicity of the result.
+  | { readonly kind: "patch"; readonly placements: readonly Placement[] };
 
 export interface Arrangement {
   readonly tiling: Tiling;
@@ -182,7 +232,7 @@ export interface Arrangement {
   readonly recipe: Recipe;
 }
 
-function seedCells(cell: Point[], seeds: readonly Placement[]): Point[][] | undefined {
+export function seedCells(cell: Point[], seeds: readonly Placement[]): Point[][] | undefined {
   const placed: Point[][] = [cell];
   for (const seed of seeds) {
     if (seed.against >= placed.length) return undefined;
@@ -194,13 +244,22 @@ function seedCells(cell: Point[], seeds: readonly Placement[]): Point[][] | unde
 }
 
 export function buildArrangement(cell: Point[], recipe: Recipe): Tiling | undefined {
+  if (recipe.kind === "patch") {
+    const patch = seedCells(cell, recipe.placements);
+    if (patch === undefined || overlapping(patch)) return undefined;
+    const found = latticeFromPatch(cell, patch);
+    return found === undefined ? undefined : squareUp(found);
+  }
   const unit = unitFor(cell, recipe);
   if (unit === undefined) return undefined;
   const found = findLattice(unit, latticeOffsets(cell, unit));
   return found === undefined ? undefined : squareUp(found);
 }
 
-function unitFor(cell: Point[], recipe: Recipe): Point[][] | undefined {
+function unitFor(
+  cell: Point[],
+  recipe: { group: Group; seeds: readonly Placement[] }
+): Point[][] | undefined {
   const seeds = seedCells(cell, recipe.seeds);
   if (seeds === undefined) return undefined;
   const motions = groupMotions(cell, recipe.group);
@@ -223,22 +282,65 @@ export function searchArrangement(
   const maxSeeds = limits.maxSeeds !== undefined ? limits.maxSeeds : 3;
   const deadline = Date.now() + (limits.milliseconds !== undefined ? limits.milliseconds : 120000);
   const spots = turnCentres(cell);
-  const groups = candidateGroups(cell, spots);
+
+  // Both halves of the double loop are worked out once. A group's motions and
+  // a seed set's cells do not depend on each other, and recomputing either
+  // inside the loop -- an atan2 per glide, per combination -- is most of the
+  // running time otherwise.
+  const groups = candidateGroups(cell, spots)
+    .map((g) => ({ ...g, motions: groupMotions(cell, g.group) }))
+    .filter((g): g is typeof g & { motions: Motion[] } => g.motions !== undefined);
 
   // Fewest seeds first, so a tiling that needs only one is never given two.
   for (let seedCount = 1; seedCount <= maxSeeds; seedCount++) {
-    for (const seeds of seedSets(cell, seedCount)) {
-      for (const { group, name } of groups) {
+    const sets = seedSets(cell, seedCount)
+      .map((seeds) => ({ seeds, cells: seedCells(cell, seeds) }))
+      .filter((set): set is typeof set & { cells: Point[][] } => set.cells !== undefined);
+    for (const set of sets) {
+      for (const { group, name, motions } of groups) {
         if (Date.now() > deadline) return undefined;
-        const recipe: Recipe = { group, seeds };
-        const unit = unitFor(cell, recipe);
-        if (unit === undefined) continue;
+        const unit = set.cells.flatMap((seed) => motions.map((m) => applyTo(m, seed)));
+        if (overlapping(unit)) continue;
         const found = findLattice(unit, latticeOffsets(cell, unit));
         if (found !== undefined) {
           const seedNote = seedCount === 1 ? "" : ` on ${seedCount} seed cells`;
-          return { tiling: squareUp(found), how: `${name}${seedNote}`, recipe };
+          return {
+            tiling: squareUp(found),
+            how: `${name}${seedNote}`,
+            recipe: { kind: "orbit", group, seeds: set.seeds },
+          };
         }
       }
+    }
+  }
+
+  // No group family fits. Tile by hand instead, and measure what comes out.
+  const budgetLeft = deadline - Date.now();
+  if (budgetLeft > 0) {
+    const laid = layArrangement(cell, deadline);
+    if (laid !== undefined) return laid;
+  }
+  return undefined;
+}
+
+// Lay a patch and read its lattice. Tried at a few sizes, smallest first,
+// because a patch only has to be big enough to come round to itself once in
+// each direction and a smaller one is quicker to find and to check.
+function layArrangement(cell: Point[], deadline: number): Arrangement | undefined {
+  for (const size of [8, 12, 16, 20, 26, 32, 40, 48]) {
+    if (Date.now() > deadline) return undefined;
+    const budget = { nodes: 200000 };
+    const placements = tileByLaying(cell, size, budget);
+    if (placements === undefined) continue;
+    const patch = seedCells(cell, placements);
+    if (patch === undefined) continue;
+    const found = latticeFromPatch(cell, patch);
+    if (found !== undefined) {
+      return {
+        tiling: squareUp(found),
+        how: `a patch of ${size} cells laid one at a time`,
+        recipe: { kind: "patch", placements },
+      };
     }
   }
   return undefined;
@@ -324,6 +426,205 @@ function dedupe(cell: Point[], sets: Placement[][]): Placement[][] {
     out.push(set);
   }
   return out;
+}
+
+// Tiling the plane by laying one cell at a time, and reading the periodicity
+// off what comes out.
+//
+// The group families above enumerate arrangements, which works while the
+// symmetry can be written down in terms of the cell -- a turn about one of
+// its corners, a flip across one of its edges. A tiling whose tiles fall into
+// several orbits need not oblige: its rotation centres can sit anywhere, so
+// there is nothing to enumerate.
+//
+// What can always be done is to tile. Take an uncovered spot against the
+// patch so far, try every way of covering it, and carry on; that is what a
+// person does with a bag of tiles, and a pentagon that tiles will fill a
+// patch this way. Then look for the translations that carry the patch into
+// itself, which is the lattice -- measured from the tiling rather than
+// assumed from a group.
+
+const PROBE = 1e-4;
+
+// How far a cell reaches from its own middle.
+function reachOf(cell: readonly Point[]): number {
+  const mid = centre(cell);
+  return Math.max(...cell.map((p) => Math.hypot(p.x - mid.x, p.y - mid.y)));
+}
+
+function insidePolygon(p: Point, polygon: readonly Point[]): boolean {
+  let hit = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i];
+    const b = polygon[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) {
+      hit = !hit;
+    }
+  }
+  return hit;
+}
+
+// A spot just outside the patch that nothing covers yet. Taken in a fixed
+// order and nearest the middle first, so the same cell always produces the
+// same patch.
+function uncoveredSpot(patch: readonly Point[][]): Point | undefined {
+  let best: Point | undefined;
+  let bestDistance = Infinity;
+  for (const cell of patch) {
+    for (let i = 0; i < cell.length; i++) {
+      const a = cell[i];
+      const b = cell[(i + 1) % cell.length];
+      const nx = -(b.y - a.y);
+      const ny = b.x - a.x;
+      const len = Math.hypot(nx, ny);
+      if (len < EPS) continue;
+      // Several spots along the edge, because a neighbour may cover part of
+      // it and leave the rest -- most of these tilings are not edge to edge.
+      for (const along of [0.25, 0.5, 0.75]) {
+        const mid = { x: a.x + (b.x - a.x) * along, y: a.y + (b.y - a.y) * along };
+        for (const side of [1, -1]) {
+          const spot = {
+            x: mid.x + (side * PROBE * nx) / len,
+            y: mid.y + (side * PROBE * ny) / len,
+          };
+          if (patch.some((other) => insidePolygon(spot, other))) continue;
+          const distance = Math.hypot(spot.x, spot.y);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = spot;
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// Every way of laying a copy that covers a given spot without overlapping
+// what is already down. Small: a spot admits only a few tiles.
+//
+// The motion is worked out against the base polygon itself, which is how
+// buildArrangement replays a recipe. Deriving it once in the reference cell's
+// frame and carrying it over with the base's own motion is faster and is
+// wrong: composing with a base that has been turned over flips the placement
+// too, so the same Placement means one thing to the search and another to the
+// replay, and a recipe that was found rebuilt a different patch.
+function coveringPlacements(
+  cell: readonly Point[],
+  patch: readonly Point[][],
+  spot: Point
+): { placement: Placement; polygon: Point[] }[] {
+  const out: { placement: Placement; polygon: Point[] }[] = [];
+  const seen = new Set<string>();
+  // Only cells near the spot can have put a tile there, and checking the far
+  // ones costs as much as checking the near ones.
+  const span = reachOf(cell) * 2.5;
+  for (let against = 0; against < patch.length; against++) {
+    const mid = centre(patch[against]);
+    if (Math.hypot(mid.x - spot.x, mid.y - spot.y) > span) continue;
+    for (const placement of allPlacements(cell.length, against)) {
+      const motion = placementMotion(cell, patch[against], placement);
+      if (motion === undefined) continue;
+      const polygon = applyTo(motion, cell);
+      if (!insidePolygon(spot, polygon)) continue;
+      if (patch.some((other) => convexOverlap(other, polygon))) continue;
+      const key = polygon.map((q) => `${q.x.toFixed(5)},${q.y.toFixed(5)}`).sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ placement, polygon });
+    }
+  }
+  return out;
+}
+
+export function tileByLaying(
+  cell: Point[],
+  cells: number,
+  budget: { nodes: number }
+): Placement[] | undefined {
+  const patch: Point[][] = [cell];
+  const chosen: Placement[] = [];
+
+  const step = (): boolean => {
+    if (patch.length >= cells) return true;
+    if (budget.nodes-- <= 0) return false;
+    const spot = uncoveredSpot(patch);
+    if (spot === undefined) return false;
+    for (const { placement, polygon } of coveringPlacements(cell, patch, spot)) {
+      patch.push(polygon);
+      chosen.push(placement);
+      if (step()) return true;
+      patch.pop();
+      chosen.pop();
+    }
+    return false;
+  };
+
+  return step() ? [...chosen] : undefined;
+}
+
+// The lattice of a patch: the translations that carry one of its cells onto
+// another facing the same way, taken two at a time.
+export function latticeFromPatch(cell: Point[], patch: Point[][]): Tiling | undefined {
+  const area = polygonArea(cell);
+  const offsets: Point[] = [];
+  for (const a of patch) {
+    for (const b of patch) {
+      const v = translationBetween(a, b);
+      if (v !== undefined && Math.hypot(v.x, v.y) > EPS) offsets.push(v);
+    }
+  }
+  const seen = new Set<string>();
+  const candidates = offsets.filter((v) => {
+    const k = `${v.x.toFixed(5)},${v.y.toFixed(5)}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  candidates.sort((p, q) => Math.hypot(p.x, p.y) - Math.hypot(q.x, q.y));
+
+  for (let i = 0; i < candidates.length; i++) {
+    for (let j = i + 1; j < candidates.length; j++) {
+      const across = candidates[i];
+      const down = candidates[j];
+      const span = Math.abs(across.x * down.y - across.y * down.x);
+      if (span < EPS) continue;
+      const count = Math.round(span / area);
+      if (count < 1 || Math.abs(span - count * area) > 1e-6) continue;
+      if (count > patch.length) continue;
+      // One representative of each cell of the tiling, modulo the lattice.
+      //
+      // Taken from the middle of the patch outwards, and skipping any that
+      // lands on top of one already taken. A patch grown a cell at a time is
+      // periodic in its middle and ragged at its edge, where a cell may
+      // belong to a neighbouring arrangement rather than this one; demanding
+      // that every cell of the patch reduce into exactly these classes threw
+      // away lattices that were right.
+      const ordered = [...patch].sort(
+        (a, b) => Math.hypot(centre(a).x, centre(a).y) - Math.hypot(centre(b).x, centre(b).y)
+      );
+      const unit: Point[][] = [];
+      const placed = new Set<string>();
+      for (const c of ordered) {
+        if (unit.length === count) break;
+        const home = intoDomain(c, across, down);
+        const key = centreKey(home);
+        if (placed.has(key)) continue;
+        if (unit.some((other) => convexOverlap(other, home))) continue;
+        placed.add(key);
+        unit.push(home);
+      }
+      if (unit.length !== count) continue;
+      const tiling: Tiling = { cells: count, across, down, unit };
+      if (checkCoverage(tiling, seeded(5), 1500).ok) return tiling;
+    }
+  }
+  return undefined;
+}
+
+function centreKey(polygon: readonly Point[]): string {
+  const m = centre(polygon);
+  return `${m.x.toFixed(5)},${m.y.toFixed(5)}`;
 }
 
 // The two vectors that carry a unit across the plane.

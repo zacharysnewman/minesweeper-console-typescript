@@ -108,6 +108,47 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(8, 40, 57, Shape.pentagonPairs),
     expert: new BoardInfo(10, 52, 122, Shape.pentagonPairs),
   },
+  // The six found by laying a patch rather than by turning copies. Columns
+  // are always a multiple of the unit's cell count, since a board cannot hold
+  // part of a unit, and the row-to-column ratio comes from the unit's own box
+  // so each comes out roughly square on screen. Seven neighbours except type
+  // 15, which has eight and so takes the classic densities unscaled.
+  [Shape.pentagonType7]: {
+    beginner: new BoardInfo(4, 48, 27, Shape.pentagonType7),
+    intermediate: new BoardInfo(5, 56, 50, Shape.pentagonType7),
+    expert: new BoardInfo(6, 72, 102, Shape.pentagonType7),
+  },
+  [Shape.pentagonType8]: {
+    beginner: new BoardInfo(4, 40, 23, Shape.pentagonType8),
+    intermediate: new BoardInfo(5, 56, 50, Shape.pentagonType8),
+    expert: new BoardInfo(7, 72, 118, Shape.pentagonType8),
+  },
+  [Shape.pentagonType9]: {
+    beginner: new BoardInfo(3, 48, 20, Shape.pentagonType9),
+    intermediate: new BoardInfo(4, 56, 40, Shape.pentagonType9),
+    expert: new BoardInfo(6, 88, 124, Shape.pentagonType9),
+  },
+  // Six cells to a unit rather than eight, and the one lattice here that
+  // leans -- its rows carry a quarter of a column sideways.
+  [Shape.pentagonType10]: {
+    beginner: new BoardInfo(5, 30, 21, Shape.pentagonType10),
+    intermediate: new BoardInfo(7, 48, 60, Shape.pentagonType10),
+    expert: new BoardInfo(9, 60, 127, Shape.pentagonType10),
+  },
+  // A unit a third as wide as it is tall, so these run twenty-four columns
+  // to the row.
+  [Shape.pentagonType13]: {
+    beginner: new BoardInfo(3, 72, 30, Shape.pentagonType13),
+    intermediate: new BoardInfo(4, 96, 68, Shape.pentagonType13),
+    expert: new BoardInfo(5, 120, 141, Shape.pentagonType13),
+  },
+  // Twelve cells in a unit barely a quarter as wide as it is tall: about
+  // forty-nine columns to the row, the widest board here by far.
+  [Shape.pentagonType15]: {
+    beginner: new BoardInfo(3, 96, 35, Shape.pentagonType15),
+    intermediate: new BoardInfo(3, 144, 67, Shape.pentagonType15),
+    expert: new BoardInfo(3, 192, 119, Shape.pentagonType15),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];

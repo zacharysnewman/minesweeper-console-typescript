@@ -196,6 +196,9 @@ export interface SolvedPentagon {
   readonly type: number;
   readonly spec: Spec;
   readonly recipe: Recipe;
+  // How many cells the arrangement has, so a recipe that replays into some
+  // other tiling is caught rather than quietly shipped.
+  readonly cells: number;
 }
 
 export const SOLVED_PENTAGONS: SolvedPentagon[] = [
@@ -205,9 +208,11 @@ export const SOLVED_PENTAGONS: SolvedPentagon[] = [
   // it needed.
   {
     name: "type 2 glide",
+    cells: 4,
     type: 2,
     spec: (t, s) => ({ angles: [120, 100, 130, 80, 110], lengths: [t, 1, s, 1, s] }),
     recipe: {
+      kind: "orbit",
       group: {
         kind: "pgg",
         centre: { at: "corner", index: 1 },
@@ -222,9 +227,11 @@ export const SOLVED_PENTAGONS: SolvedPentagon[] = [
   // exactly, and that is the whole arrangement.
   {
     name: "type 4 ears",
+    cells: 4,
     type: 4,
     spec: (t, s) => ({ angles: [130, 90, 110, 90, 120], lengths: [t, 1, 1, s, s] }),
     recipe: {
+      kind: "orbit",
       group: { kind: "cyclic", centre: { at: "corner", index: 1 }, order: 4 },
       seeds: [],
     },
@@ -237,9 +244,11 @@ export const SOLVED_PENTAGONS: SolvedPentagon[] = [
   // here, and the only one of these that matches the square's eight.
   {
     name: "type 5 fan",
+    cells: 12,
     type: 5,
     spec: (t, s) => ({ angles: [60, 100, 150, 120, 110], lengths: [1, 1, s, t, t] }),
     recipe: {
+      kind: "orbit",
       group: { kind: "cyclic", centre: { at: "corner", index: 0 }, order: 6 },
       seeds: [],
     },
@@ -250,40 +259,124 @@ export const SOLVED_PENTAGONS: SolvedPentagon[] = [
   // than one cell: nothing about the group or the size was the obstacle.
   {
     name: "type 6 pairs",
+    cells: 4,
     type: 6,
     spec: (t, s) => ({ angles: [200 - t, t, 160 - t, 180 - t, 2 * t], lengths: [1, s, s, 1, 1] }),
     recipe: {
+      kind: "orbit",
       group: { kind: "cyclic", centre: { at: "edge", index: 1 }, order: 2 },
       seeds: [{ against: 0, baseEdge: 0, cellEdge: 1, flip: false, swap: true }],
     },
   },
+
+  // Kershner, 1968. Four equal edges with B + 2E = 360 and 2C + D = 360.
+  // Two orbits of four, and its turning centres are nowhere on the cell, so
+  // there was nothing for the group families to enumerate.
+  {
+    name: "type 7",
+    cells: 8,
+    type: 7,
+    spec: (t, s) => ({ angles: [s - 46, 360 - 2 * s, 134, 92, s], lengths: [t, 1, 1, 1, 1] }),
+    recipe: {"kind": "patch", "placements": [{"against": 0, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": true}, {"against": 1, "baseEdge": 1, "cellEdge": 2, "flip": false, "swap": true}, {"against": 0, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 1, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 0, "baseEdge": 1, "cellEdge": 2, "flip": false, "swap": true}, {"against": 1, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 2, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 1, "baseEdge": 3, "cellEdge": 1, "flip": false, "swap": true}, {"against": 4, "baseEdge": 1, "cellEdge": 3, "flip": true, "swap": false}, {"against": 2, "baseEdge": 0, "cellEdge": 3, "flip": true, "swap": true}, {"against": 3, "baseEdge": 2, "cellEdge": 1, "flip": true, "swap": false}, {"against": 0, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 0, "baseEdge": 3, "cellEdge": 1, "flip": false, "swap": true}, {"against": 4, "baseEdge": 2, "cellEdge": 0, "flip": false, "swap": false}, {"against": 7, "baseEdge": 1, "cellEdge": 0, "flip": true, "swap": false}, {"against": 7, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": false}, {"against": 9, "baseEdge": 2, "cellEdge": 0, "flip": true, "swap": false}, {"against": 11, "baseEdge": 3, "cellEdge": 0, "flip": false, "swap": false}, {"against": 8, "baseEdge": 4, "cellEdge": 0, "flip": false, "swap": true}]},
+  },
+  // Kershner, 1968. The same four equal edges, a different pair of angle
+  // sums, and a different tiling: eight cells again, in a squarer box.
+  {
+    name: "type 8",
+    cells: 8,
+    type: 8,
+    spec: (t, s) => ({ angles: [s - 70, 110, 140, 360 - 2 * s, s], lengths: [t, 1, 1, 1, 1] }),
+    recipe: {"kind": "patch", "placements": [{"against": 0, "baseEdge": 0, "cellEdge": 1, "flip": false, "swap": true}, {"against": 1, "baseEdge": 2, "cellEdge": 3, "flip": true, "swap": true}, {"against": 0, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 1, "baseEdge": 3, "cellEdge": 3, "flip": false, "swap": true}, {"against": 0, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": true}, {"against": 2, "baseEdge": 1, "cellEdge": 1, "flip": true, "swap": false}, {"against": 1, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 0, "baseEdge": 3, "cellEdge": 2, "flip": true, "swap": true}, {"against": 5, "baseEdge": 3, "cellEdge": 1, "flip": false, "swap": true}, {"against": 0, "baseEdge": 2, "cellEdge": 0, "flip": false, "swap": true}, {"against": 3, "baseEdge": 2, "cellEdge": 0, "flip": false, "swap": false}, {"against": 6, "baseEdge": 4, "cellEdge": 2, "flip": false, "swap": false}, {"against": 7, "baseEdge": 2, "cellEdge": 0, "flip": true, "swap": false}, {"against": 2, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": false}, {"against": 4, "baseEdge": 1, "cellEdge": 0, "flip": false, "swap": true}]},
+  },
+  // Rice, 1976. The one edge-to-edge tiling among Rice's four.
+  {
+    name: "type 9",
+    cells: 8,
+    type: 9,
+    spec: (t, s) => ({ angles: [110, s - 70, 140, 360 - 2 * s, s], lengths: [t, 1, 1, 1, 1] }),
+    recipe: {"kind": "patch", "placements": [{"against": 0, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 0, "baseEdge": 0, "cellEdge": 1, "flip": false, "swap": true}, {"against": 0, "baseEdge": 3, "cellEdge": 3, "flip": false, "swap": true}, {"against": 2, "baseEdge": 3, "cellEdge": 2, "flip": true, "swap": true}, {"against": 0, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": true}, {"against": 1, "baseEdge": 1, "cellEdge": 0, "flip": true, "swap": false}, {"against": 2, "baseEdge": 0, "cellEdge": 2, "flip": true, "swap": true}, {"against": 2, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 0, "baseEdge": 2, "cellEdge": 3, "flip": true, "swap": true}, {"against": 1, "baseEdge": 2, "cellEdge": 0, "flip": false, "swap": false}, {"against": 5, "baseEdge": 0, "cellEdge": 1, "flip": false, "swap": true}, {"against": 3, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": true}, {"against": 4, "baseEdge": 4, "cellEdge": 4, "flip": false, "swap": false}, {"against": 5, "baseEdge": 3, "cellEdge": 3, "flip": false, "swap": true}, {"against": 4, "baseEdge": 0, "cellEdge": 1, "flip": true, "swap": false}, {"against": 5, "baseEdge": 4, "cellEdge": 4, "flip": true, "swap": true}, {"against": 6, "baseEdge": 3, "cellEdge": 2, "flip": false, "swap": false}, {"against": 6, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": false}, {"against": 8, "baseEdge": 1, "cellEdge": 1, "flip": true, "swap": false}, {"against": 7, "baseEdge": 0, "cellEdge": 2, "flip": false, "swap": false}, {"against": 3, "baseEdge": 0, "cellEdge": 1, "flip": false, "swap": true}, {"against": 13, "baseEdge": 2, "cellEdge": 0, "flip": true, "swap": true}, {"against": 9, "baseEdge": 1, "cellEdge": 0, "flip": true, "swap": false}, {"against": 10, "baseEdge": 2, "cellEdge": 0, "flip": true, "swap": true}, {"against": 11, "baseEdge": 3, "cellEdge": 2, "flip": true, "swap": true}]},
+  },
+  // James, 1975, after reading Kershner in Martin Gardner's column. Six
+  // cells to a unit rather than eight, and the only one of these whose
+  // lattice leans.
+  {
+    name: "type 10",
+    cells: 6,
+    type: 10,
+    spec: (t, s) => ({ angles: [90, 120, 120, 150, 60], lengths: [t + s, t + s, t, 1, s] }),
+    recipe: {"kind": "patch", "placements": [{"against": 0, "baseEdge": 4, "cellEdge": 0, "flip": false, "swap": true}, {"against": 1, "baseEdge": 4, "cellEdge": 0, "flip": false, "swap": true}, {"against": 0, "baseEdge": 0, "cellEdge": 4, "flip": false, "swap": true}, {"against": 1, "baseEdge": 1, "cellEdge": 0, "flip": true, "swap": true}, {"against": 2, "baseEdge": 1, "cellEdge": 4, "flip": true, "swap": true}, {"against": 3, "baseEdge": 1, "cellEdge": 0, "flip": true, "swap": true}, {"against": 0, "baseEdge": 1, "cellEdge": 4, "flip": true, "swap": true}, {"against": 3, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": true}, {"against": 1, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": true}, {"against": 2, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 0, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 6, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": false}, {"against": 4, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": false}, {"against": 6, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": false}, {"against": 4, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": false}, {"against": 8, "baseEdge": 0, "cellEdge": 3, "flip": false, "swap": false}, {"against": 9, "baseEdge": 0, "cellEdge": 3, "flip": false, "swap": false}, {"against": 6, "baseEdge": 3, "cellEdge": 3, "flip": true, "swap": false}, {"against": 4, "baseEdge": 3, "cellEdge": 3, "flip": true, "swap": false}]},
+  },
+  // Rice, 1977. d = 2a = 2e with two right angles. Its unit is eight cells
+  // in a box a third as wide as it is tall, so the boards run very wide.
+  {
+    name: "type 13",
+    cells: 8,
+    type: 13,
+    spec: (t, s) => ({ angles: [110, 90, 110, 140, 90], lengths: [t, 1, s, 2 * t, t] }),
+    recipe: {"kind": "patch", "placements": [{"against": 0, "baseEdge": 4, "cellEdge": 2, "flip": true, "swap": true}, {"against": 0, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 0, "baseEdge": 3, "cellEdge": 4, "flip": false, "swap": true}, {"against": 2, "baseEdge": 3, "cellEdge": 2, "flip": false, "swap": false}, {"against": 1, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": false}, {"against": 2, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": false}, {"against": 0, "baseEdge": 2, "cellEdge": 4, "flip": true, "swap": true}, {"against": 7, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 4, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 1, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": false}, {"against": 6, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": false}, {"against": 5, "baseEdge": 1, "cellEdge": 1, "flip": true, "swap": true}, {"against": 5, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 5, "baseEdge": 3, "cellEdge": 4, "flip": false, "swap": true}, {"against": 4, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}, {"against": 0, "baseEdge": 1, "cellEdge": 1, "flip": true, "swap": true}, {"against": 2, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": false}, {"against": 9, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": false}, {"against": 7, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": false}, {"against": 19, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": false}, {"against": 13, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 11, "baseEdge": 2, "cellEdge": 3, "flip": false, "swap": true}, {"against": 9, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 6, "baseEdge": 4, "cellEdge": 3, "flip": true, "swap": false}, {"against": 13, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}]},
+  },
+  // Mann, McLoud and Von Derau, 2015 -- the last pentagon found, and the one
+  // that completed the classification two years later. Its angles are fixed,
+  // not a family: 150, 60, 135, 105, 90. Twelve cells to a unit and eight
+  // neighbours.
+  {
+    name: "type 15",
+    cells: 12,
+    type: 15,
+    spec: (t, s) => ({ angles: [150, 60, 135, 105, 90], lengths: [s, 2 * s, s, t, s] }),
+    recipe: {"kind": "patch", "placements": [{"against": 0, "baseEdge": 4, "cellEdge": 1, "flip": false, "swap": true}, {"against": 0, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 2, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 0, "baseEdge": 3, "cellEdge": 1, "flip": true, "swap": true}, {"against": 2, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": false}, {"against": 0, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 4, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": false}, {"against": 2, "baseEdge": 1, "cellEdge": 3, "flip": false, "swap": false}, {"against": 0, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": true}, {"against": 6, "baseEdge": 3, "cellEdge": 1, "flip": true, "swap": true}, {"against": 1, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}, {"against": 6, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 5, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}, {"against": 13, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": true}, {"against": 14, "baseEdge": 4, "cellEdge": 3, "flip": true, "swap": false}, {"against": 6, "baseEdge": 4, "cellEdge": 1, "flip": false, "swap": true}, {"against": 7, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": true}, {"against": 4, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 7, "baseEdge": 4, "cellEdge": 1, "flip": false, "swap": true}, {"against": 3, "baseEdge": 1, "cellEdge": 4, "flip": true, "swap": false}, {"against": 12, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": false}, {"against": 12, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 11, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 14, "baseEdge": 0, "cellEdge": 3, "flip": false, "swap": false}, {"against": 7, "baseEdge": 3, "cellEdge": 1, "flip": true, "swap": true}, {"against": 9, "baseEdge": 4, "cellEdge": 1, "flip": false, "swap": true}, {"against": 18, "baseEdge": 2, "cellEdge": 2, "flip": false, "swap": false}, {"against": 17, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 9, "baseEdge": 3, "cellEdge": 1, "flip": true, "swap": true}, {"against": 8, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": true}, {"against": 17, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": true}, {"against": 28, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 20, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": false}, {"against": 24, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}, {"against": 10, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}, {"against": 15, "baseEdge": 1, "cellEdge": 3, "flip": false, "swap": false}, {"against": 16, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}, {"against": 13, "baseEdge": 1, "cellEdge": 3, "flip": true, "swap": true}, {"against": 23, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": false}, {"against": 21, "baseEdge": 4, "cellEdge": 3, "flip": false, "swap": true}, {"against": 27, "baseEdge": 0, "cellEdge": 0, "flip": true, "swap": true}, {"against": 33, "baseEdge": 0, "cellEdge": 0, "flip": false, "swap": false}, {"against": 34, "baseEdge": 2, "cellEdge": 2, "flip": true, "swap": true}, {"against": 28, "baseEdge": 1, "cellEdge": 1, "flip": false, "swap": false}, {"against": 32, "baseEdge": 0, "cellEdge": 2, "flip": true, "swap": false}, {"against": 24, "baseEdge": 0, "cellEdge": 3, "flip": false, "swap": true}, {"against": 25, "baseEdge": 3, "cellEdge": 4, "flip": true, "swap": false}]},
+  },
 ];
 
+// Built when first asked for, and remembered.
+//
+// Solving a pentagon and replaying its recipe is milliseconds each, and a
+// dozen of them at import was most of a second before the page had drawn
+// anything. A page plays one shape at a time, so only that shape's tiling is
+// ever built.
+const built = new Map<string, Tiling>();
+
 function solved(name: string): Tiling {
+  const already = built.get(name);
+  if (already !== undefined) return already;
   const entry = SOLVED_PENTAGONS.find((p) => p.name === name);
   if (entry === undefined) {
     throw new Error(`no solved pentagon called ${name}`);
   }
-  return fromType(entry.spec, entry.recipe);
+  const tiling = fromType(entry.spec, entry.recipe);
+  built.set(name, tiling);
+  return tiling;
 }
 
-export const type2Glide: Tiling = solved("type 2 glide");
-export const type4Ears: Tiling = solved("type 4 ears");
-export const type5Fan: Tiling = solved("type 5 fan");
-export const type6Pairs: Tiling = solved("type 6 pairs");
+export const type2Glide = (): Tiling => solved("type 2 glide");
+export const type4Ears = (): Tiling => solved("type 4 ears");
+export const type5Fan = (): Tiling => solved("type 5 fan");
+export const type6Pairs = (): Tiling => solved("type 6 pairs");
+export const type7 = (): Tiling => solved("type 7");
+export const type8 = (): Tiling => solved("type 8");
+export const type9 = (): Tiling => solved("type 9");
+export const type10 = (): Tiling => solved("type 10");
+export const type13 = (): Tiling => solved("type 13");
+export const type15 = (): Tiling => solved("type 15");
 
 // Every pentagon board, with how many seed cells the search needs to find an
 // arrangement for it. That number is the tiling's orbit count, and it is
 // carried here because a check that searches for one of these has to be
 // allowed the seeds it takes -- type 6's cells are two orbits, and no search
 // from a single seed will ever arrange them.
-export const pentagonTilings: { name: string; tiling: Tiling; seeds: number }[] = [
+export const pentagonTilings = (): { name: string; tiling: Tiling; seeds: number }[] => [
   { name: "hexagon thirds", tiling: hexagonThirds, seeds: 1 },
   { name: "hexagon halves", tiling: hexagonHalves, seeds: 1 },
   { name: "house rows", tiling: houseRows, seeds: 1 },
   { name: "paired slab", tiling: pairedSlab, seeds: 1 },
-  { name: "type 2 glide", tiling: type2Glide, seeds: 1 },
-  { name: "type 4 ears", tiling: type4Ears, seeds: 1 },
-  { name: "type 5 fan", tiling: type5Fan, seeds: 1 },
-  { name: "type 6 pairs", tiling: type6Pairs, seeds: 2 },
+  { name: "type 2 glide", tiling: type2Glide(), seeds: 1 },
+  { name: "type 4 ears", tiling: type4Ears(), seeds: 1 },
+  { name: "type 5 fan", tiling: type5Fan(), seeds: 1 },
+  { name: "type 6 pairs", tiling: type6Pairs(), seeds: 2 },
+  { name: "type 7", tiling: type7(), seeds: 1 },
+  { name: "type 8", tiling: type8(), seeds: 1 },
+  { name: "type 9", tiling: type9(), seeds: 1 },
+  { name: "type 10", tiling: type10(), seeds: 1 },
+  { name: "type 13", tiling: type13(), seeds: 1 },
+  { name: "type 15", tiling: type15(), seeds: 1 },
 ];

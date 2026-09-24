@@ -22,7 +22,7 @@ import {
   ShapeStateChangedEvent,
 } from "./ShapeEvents";
 import { ShapeGame } from "./ShapeGame";
-import { polygonArea, searchArrangement } from "./arrange";
+import { buildArrangement, polygonArea, searchArrangement } from "./arrange";
 import { solvePentagon } from "./pentagonShapes";
 
 import { allShapes, Shape, shapeName } from "./Shape";
@@ -47,7 +47,7 @@ import {
 } from "./Tiling";
 import { pentagonTilings, SOLVED_PENTAGONS } from "./pentagons";
 import { PENTAGON_TYPES, typesOf } from "./pentagonTypes";
-import { TILINGS, topologyFor } from "./Topology";
+import { tilingFor, topologyFor } from "./Topology";
 import { layoutFor as layoutForShape } from "./geometry";
 
 // The project has no test runner, so the shape rules check themselves:
@@ -145,7 +145,7 @@ for (const shape of allShapes) {
   // tiling's neighbours reach into the next primitive unit, so "near an edge"
   // is measured in units and not in cells: twelve columns of a six-cell unit
   // is two units across, and almost nothing in it is interior at all.
-  const unitCells = TILINGS[shape]?.cells ?? 1;
+  const unitCells = tilingFor(shape)?.cells ?? 1;
   const span = 12 * unitCells;
   const margin = 3 * unitCells;
   const cells: Coords[] = [];
@@ -393,7 +393,7 @@ for (const shape of allShapes) {
   );
   // A tiling repeats a primitive unit, so a board that ends mid-unit would
   // have cells whose neighbours were never placed.
-  const tiling = TILINGS[shape];
+  const tiling = tilingFor(shape);
   if (tiling !== undefined) {
     check(
       `${name}: every preset holds a whole number of primitive units`,
@@ -478,7 +478,7 @@ for (const shape of allShapes) {
   // A triangle's two orientations put the content centre in different places,
   // so both have to be checked. (0,0) points up and (0,1) points down; for the
   // other shapes the second is just another cell.
-  const tiling = TILINGS[shape];
+  const tiling = tilingFor(shape);
   const orientations: [string, Coords][] =
     tiling !== undefined
       ? Array.from({ length: tiling.cells }, (_unused, i) => [
@@ -530,7 +530,7 @@ console.log("\npentagons against the classification\n");
   // way every edge condition sits one place out. A tiling that plainly
   // covered the plane then matched none of the fifteen, which is what
   // exposed the mistake.
-  for (const { name, tiling } of pentagonTilings) {
+  for (const { name, tiling } of pentagonTilings()) {
     const types = typesOf(tiling.unit[0]);
     check(
       `${name}: is one of the fifteen types [${types.join(", ") || "none"}]`,
@@ -566,7 +566,7 @@ console.log("\nnumbers centred and all one size\n");
 for (const shape of allShapes) {
   const name = shapeName(shape);
   const layout = layoutFor(shape, 34);
-  const cells = TILINGS[shape]?.cells ?? 2;
+  const cells = tilingFor(shape)?.cells ?? 2;
   const at = Array.from({ length: cells }, (_unused, i) => new Coords(0, i));
 
   // Cells of one unit are usually congruent, but a horizontal box does not
@@ -724,7 +724,7 @@ console.log("\ntilings described as geometry\n");
 
   const named: { name: string; tiling: Tiling }[] = [
     ...references.map((r) => ({ name: r.name, tiling: r.tiling })),
-    ...pentagonTilings,
+    ...pentagonTilings(),
   ];
 
   for (const { name, tiling } of named) {
@@ -847,21 +847,48 @@ console.log("\narrangements searched for, not written down\n");
     );
   }
 
-  // Second, that the recipe is still what the search finds. The recipe is
-  // written down because searching takes seconds and a page cannot wait; this
-  // is what stops it becoming a number nobody can re-derive.
-  for (const { name: label, spec, recipe } of SOLVED_PENTAGONS) {
+  // Second, that each recipe still replays into the tiling it is shipped as.
+  //
+  // This is the check with teeth, and it is the cheap one. A recipe is a
+  // description of how copies were laid, so replaying it either reproduces a
+  // tiling of that same pentagon or it does not -- and coverage, symmetric
+  // adjacency and the cell count say which. Re-running the search instead
+  // would cost minutes a type, and for the arrangements found by laying a
+  // patch it would be checking the order a depth-first search happened to
+  // take rather than anything about the tiling.
+  for (const { name: label, spec, recipe, cells } of SOLVED_PENTAGONS) {
     const cell = solvePentagon(spec);
     if (cell === undefined) continue;
-    // Held to the recipe's own seed count. A search allowed more seeds than
-    // the answer needs would take minutes, and would also accept a worse
-    // arrangement than the one being checked for.
-    const found = searchArrangement(cell, { maxSeeds: recipe.seeds.length + 1 });
-    check(`${label}: the search still finds an arrangement`, found !== undefined);
-    if (found === undefined) continue;
+    const replayed = buildArrangement(cell, recipe);
+    check(`${label}: its recipe replays into a tiling`, replayed !== undefined);
+    if (replayed === undefined) continue;
     check(
-      `${label}: and it is the one written down (${found.how})`,
-      JSON.stringify(found.recipe) === JSON.stringify(recipe)
+      `${label}: of ${cells} cells, as shipped`,
+      replayed.cells === cells
+    );
+    check(
+      `${label}: built from that same pentagon`,
+      replayed.unit.every(
+        (c) => Math.abs(polygonArea(c) - polygonArea(cell)) < 1e-6
+      )
+    );
+    check(
+      `${label}: covering the plane`,
+      checkCoverage(replayed, Math.random, 4000).ok
+    );
+    const derived = deriveOffsets(replayed);
+    check(
+      `${label}: with adjacency that runs both ways`,
+      derived.every((row, index) =>
+        row.every((offset) =>
+          derived[offset.index].some(
+            (back) =>
+              back.index === index &&
+              back.dRow === -offset.dRow &&
+              back.dUnitColumn === -offset.dUnitColumn
+          )
+        )
+      )
     );
   }
 
@@ -874,7 +901,7 @@ console.log("\narrangements searched for, not written down\n");
   // different, equally valid tiling of four cells with seven. Asserting the
   // known degree here failed on exactly that, and the check was wrong rather
   // than the search.
-  for (const { name, tiling, seeds } of pentagonTilings) {
+  for (const { name, tiling, seeds } of pentagonTilings()) {
     const cell = tiling.unit[0].map((p) => ({ ...p }));
     // Allowed the seeds that tiling's orbit count needs, and no more: this is
     // a check that the search works, not a hunt for a smaller arrangement.
@@ -910,7 +937,7 @@ console.log("\narrangements searched for, not written down\n");
   // The house tiling two ways is worth pinning rather than leaving as a
   // surprise: it is the reason the loop above cannot check a degree.
   {
-    const house = pentagonTilings.find((t) => t.name === "house rows");
+    const house = pentagonTilings().find((t) => t.name === "house rows");
     check(
       "the house pentagon is shipped with six neighbours",
       house !== undefined &&

@@ -1,7 +1,7 @@
 import { Coords } from "../State/Coords";
 import { Point } from "./Point";
 import { Shape } from "./Shape";
-import { pointsUp, TILINGS } from "./Topology";
+import { pointsUp, tilingFor } from "./Topology";
 import { addressOf, polygonAt, Tiling } from "./Tiling";
 
 // A type, so the re-export has to say so: the bundler strips types and would
@@ -293,7 +293,7 @@ export function forBoard(layout: Layout, rows: number, cols: number): Layout {
 }
 
 export function layoutFor(shape: Shape, content: number): Layout {
-  const tiling = TILINGS[shape];
+  const tiling = tilingFor(shape);
   if (tiling !== undefined) {
     return tilingLayout(shape, tiling, content);
   }

@@ -35,6 +35,12 @@ const PREFERRED_CELL: Record<Shape, number> = {
   [Shape.pentagonFan]: 30,
   [Shape.pentagonGlide]: 30,
   [Shape.pentagonPairs]: 30,
+  [Shape.pentagonType7]: 30,
+  [Shape.pentagonType8]: 30,
+  [Shape.pentagonType9]: 30,
+  [Shape.pentagonType10]: 30,
+  [Shape.pentagonType13]: 30,
+  [Shape.pentagonType15]: 30,
 };
 
 // Below this a board stops being readable, and scrolling is the better answer
