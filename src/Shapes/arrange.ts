@@ -102,28 +102,66 @@ function turnCentres(cell: readonly Point[]): { centre: Centre; name: string }[]
 // meet, and whether the copy is turned over. Lengths need not match, because
 // most of the fifteen types are not edge to edge and a copy's edge runs part
 // way along its neighbour's.
-export interface Placement {
-  // Which already-placed cell to lay this one against; 0 is the seed itself.
-  readonly against: number;
-  readonly baseEdge: number;
-  readonly cellEdge: number;
-  readonly flip: boolean;
-  readonly swap: boolean;
-  // How far to slide the copy along the edge after lining it up, as the
-  // length of one of the cell's own edges. Most of the fifteen types are not
-  // edge to edge: a copy's corner lands part way along its neighbour's edge,
-  // at a distance set by whichever edge of the neighbour ends there. Without
-  // this the only positions reachable are the ones where corners coincide,
-  // and a tiling that never does them is unreachable.
-  readonly slide?: { readonly edge: number; readonly sign: 1 | -1 };
-}
+// Two ways of saying where a copy goes, both relative to cells already down.
+//
+// "edge" lays it against one edge of one cell, corner to corner. That reaches
+// every edge-to-edge tiling and, through some other neighbour, most of the
+// rest.
+//
+// "corner" only puts one of its corners on an existing corner and turns it to
+// line up with an existing edge -- leaving the rest of the cell to land where
+// it will, part way along its neighbours' edges. Most of the fifteen types
+// are not edge to edge, and three of them need this: laying by edges alone,
+// every branch of the search reached an unfillable gap at about nine cells.
+export type Placement =
+  | {
+      readonly at?: "edge";
+      // Which already-placed cell to lay this one against; 0 is the seed.
+      readonly against: number;
+      readonly baseEdge: number;
+      readonly cellEdge: number;
+      readonly flip: boolean;
+      readonly swap: boolean;
+    }
+  | {
+      readonly at: "corner";
+      readonly against: number;
+      // The corner of that cell to sit on, and the corner of the copy to
+      // sit there.
+      readonly baseCorner: number;
+      readonly cellCorner: number;
+      // The edge to line up with, named by the patch cell it belongs to and
+      // its index there, so a recipe replays without depending on the order
+      // anything was enumerated in.
+      readonly dirCell: number;
+      readonly dirEdge: number;
+      readonly flip: boolean;
+    };
 
 function placementMotion(
   cell: readonly Point[],
   against: readonly Point[],
-  placement: Placement
+  placement: Placement,
+  patch?: readonly Point[][]
 ): Motion | undefined {
   const n = cell.length;
+  if (placement.at === "corner") {
+    if (patch === undefined) return undefined;
+    const dirOwner = patch[placement.dirCell];
+    if (dirOwner === undefined) return undefined;
+    const e0 = dirOwner[placement.dirEdge];
+    const e1 = dirOwner[(placement.dirEdge + 1) % dirOwner.length];
+    const ta = Math.atan2(e1.y - e0.y, e1.x - e0.x);
+    const q = cell[placement.cellCorner];
+    const r = cell[(placement.cellCorner + 1) % n];
+    const fa = Math.atan2(r.y - q.y, r.x - q.x);
+    const to = against[placement.baseCorner];
+    const mirror: Motion = placement.flip ? [1, 0, 0, -1, 0, 0] : IDENTITY;
+    const toOrigin: Motion = [1, 0, 0, 1, -q.x, -q.y];
+    const rot = turnMotion({ x: 0, y: 0 }, ta - (placement.flip ? -fa : fa));
+    const back: Motion = [1, 0, 0, 1, to.x, to.y];
+    return compose(back, compose(rot, compose(mirror, toOrigin)));
+  }
   const p0 = against[placement.baseEdge];
   const p1 = against[(placement.baseEdge + 1) % n];
   const q0 = cell[placement.cellEdge];
@@ -144,18 +182,7 @@ function placementMotion(
   const toOrigin: Motion = [1, 0, 0, 1, -from0.x, -from0.y];
   const rot = turnMotion({ x: 0, y: 0 }, ta - (placement.flip ? -fa : fa));
 
-  let ox = to0.x;
-  let oy = to0.y;
-  if (placement.slide !== undefined) {
-    const along = Math.hypot(to1.x - to0.x, to1.y - to0.y);
-    if (along < EPS) return undefined;
-    const u = cell[placement.slide.edge];
-    const v = cell[(placement.slide.edge + 1) % n];
-    const by = Math.hypot(v.x - u.x, v.y - u.y) * placement.slide.sign;
-    ox += ((to1.x - to0.x) / along) * by;
-    oy += ((to1.y - to0.y) / along) * by;
-  }
-  const back: Motion = [1, 0, 0, 1, ox, oy];
+  const back: Motion = [1, 0, 0, 1, to0.x, to0.y];
   return compose(back, compose(rot, compose(mirror, toOrigin)));
 }
 
@@ -175,13 +202,37 @@ function allPlacements(cellLength: number, against: number): Placement[] {
 
 // The same, plus the slid positions. Kept separate because the group
 // families do not need them and there are eleven times as many.
-function allPlacementsWithSlides(cellLength: number, against: number): Placement[] {
+// The corner-anchored placements: a corner of the copy on an existing corner,
+// turned to line up with an existing edge, leaving the rest of the cell to
+// land where it will -- part way along its neighbours' edges.
+//
+// Generated only against cells near the spot being covered, or there would be
+// thousands. Three of the fifteen types need these: laying by whole edges
+// alone, every branch of the search reached an unfillable gap at nine cells.
+function cornerPlacements(
+  cell: readonly Point[],
+  patch: readonly Point[][],
+  near: readonly number[]
+): Placement[] {
   const out: Placement[] = [];
-  for (const placement of allPlacements(cellLength, against)) {
-    out.push(placement);
-    for (let edge = 0; edge < cellLength; edge++) {
-      for (const sign of [1, -1] as const) {
-        out.push({ ...placement, slide: { edge, sign } });
+  for (const against of near) {
+    for (let baseCorner = 0; baseCorner < patch[against].length; baseCorner++) {
+      for (let cellCorner = 0; cellCorner < cell.length; cellCorner++) {
+        for (const dirCell of near) {
+          for (let dirEdge = 0; dirEdge < patch[dirCell].length; dirEdge++) {
+            for (const flip of [false, true]) {
+              out.push({
+                at: "corner",
+                against,
+                baseCorner,
+                cellCorner,
+                dirCell,
+                dirEdge,
+                flip,
+              });
+            }
+          }
+        }
       }
     }
   }
@@ -236,7 +287,7 @@ export function seedCells(cell: Point[], seeds: readonly Placement[]): Point[][]
   const placed: Point[][] = [cell];
   for (const seed of seeds) {
     if (seed.against >= placed.length) return undefined;
-    const motion = placementMotion(cell, placed[seed.against], seed);
+    const motion = placementMotion(cell, placed[seed.against], seed, placed);
     if (motion === undefined) return undefined;
     placed.push(applyTo(motion, cell));
   }
@@ -330,18 +381,24 @@ function layArrangement(cell: Point[], deadline: number): Arrangement | undefine
   for (const size of [8, 12, 16, 20, 26, 32, 40, 48]) {
     if (Date.now() > deadline) return undefined;
     const budget = { nodes: 200000 };
-    const placements = tileByLaying(cell, size, budget);
-    if (placements === undefined) continue;
-    const patch = seedCells(cell, placements);
-    if (patch === undefined) continue;
-    const found = latticeFromPatch(cell, patch);
-    if (found !== undefined) {
-      return {
-        tiling: squareUp(found),
-        how: `a patch of ${size} cells laid one at a time`,
-        recipe: { kind: "patch", placements },
-      };
-    }
+    let lattice: Tiling | undefined;
+    const placements = tileByLaying(
+      cell,
+      size,
+      budget,
+      (patch) => {
+        if (Date.now() > deadline) return false;
+        lattice = latticeFromPatch(cell, [...patch]);
+        return lattice !== undefined;
+      },
+      deadline
+    );
+    if (placements === undefined || lattice === undefined) continue;
+    return {
+      tiling: squareUp(lattice),
+      how: `a patch of ${size} cells laid one at a time`,
+      recipe: { kind: "patch", placements },
+    };
   }
   return undefined;
 }
@@ -374,7 +431,7 @@ function candidateGroups(
     for (const spot of spots) {
       out.push({
         group: { kind: "pgg", centre: spot.centre, glide: placement },
-        name: `a half turn about ${spot.name} with a flip across edge ${placement.baseEdge}`,
+        name: `a half turn about ${spot.name} with a flip`,
       });
     }
   }
@@ -519,11 +576,18 @@ function coveringPlacements(
   // Only cells near the spot can have put a tile there, and checking the far
   // ones costs as much as checking the near ones.
   const span = reachOf(cell) * 2.5;
+  const near: number[] = [];
   for (let against = 0; against < patch.length; against++) {
     const mid = centre(patch[against]);
-    if (Math.hypot(mid.x - spot.x, mid.y - spot.y) > span) continue;
-    for (const placement of allPlacements(cell.length, against)) {
-      const motion = placementMotion(cell, patch[against], placement);
+    if (Math.hypot(mid.x - spot.x, mid.y - spot.y) <= span) near.push(against);
+  }
+  const tries: Placement[] = [
+    ...near.flatMap((against) => allPlacements(cell.length, against)),
+    ...cornerPlacements(cell, patch, near),
+  ];
+  {
+    for (const placement of tries) {
+      const motion = placementMotion(cell, patch[placement.against], placement, patch);
       if (motion === undefined) continue;
       const polygon = applyTo(motion, cell);
       if (!insidePolygon(spot, polygon)) continue;
@@ -534,20 +598,41 @@ function coveringPlacements(
       out.push({ placement, polygon });
     }
   }
+  // Nearest the middle first. A periodic tiling grows as a compact blob,
+  // where a fill that takes whatever placement comes first tends to wander
+  // outward and never come round to itself -- and a patch that never does has
+  // no lattice to read off it.
+  out.sort((a, b) => {
+    const p = centre(a.polygon);
+    const q = centre(b.polygon);
+    return Math.hypot(p.x, p.y) - Math.hypot(q.x, q.y);
+  });
   return out;
 }
 
+// `accept` decides whether a finished patch is the one wanted. Without it
+// the search stops at the first arrangement that packs, and for three of the
+// fifteen types that arrangement wanders -- it fills the plane locally and
+// never comes round to itself, so there is no lattice to read off it. Asking
+// for a periodic patch instead keeps the search going through the others.
 export function tileByLaying(
   cell: Point[],
   cells: number,
-  budget: { nodes: number }
+  budget: { nodes: number },
+  accept: (patch: readonly Point[][]) => boolean = () => true,
+  deadline = Infinity
 ): Placement[] | undefined {
   const patch: Point[][] = [cell];
   const chosen: Placement[] = [];
 
   const step = (): boolean => {
-    if (patch.length >= cells) return true;
+    if (patch.length >= cells) return accept(patch);
+    // Both bounds are needed. A node was cheap when a cell could only be laid
+    // against a whole edge; with the corner-anchored placements one node can
+    // cost a hundred times as much, so a node budget alone stopped bounding
+    // how long this runs.
     if (budget.nodes-- <= 0) return false;
+    if ((budget.nodes & 0xff) === 0 && Date.now() > deadline) return false;
     const spot = uncoveredSpot(patch);
     if (spot === undefined) return false;
     for (const { placement, polygon } of coveringPlacements(cell, patch, spot)) {

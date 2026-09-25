@@ -149,6 +149,26 @@ export const PRESETS: Record<Shape, Record<string, BoardInfo>> = {
     intermediate: new BoardInfo(3, 144, 67, Shape.pentagonType15),
     expert: new BoardInfo(3, 192, 119, Shape.pentagonType15),
   },
+  // The last three, all needing a corner-anchored placement to reach. Seven
+  // neighbours, except type 12 which has six -- the same as a hexagon, and
+  // the only one of the later types with as few, so it takes the hex
+  // densities.
+  [Shape.pentagonType11]: {
+    beginner: new BoardInfo(5, 40, 28, Shape.pentagonType11),
+    intermediate: new BoardInfo(6, 56, 60, Shape.pentagonType11),
+    expert: new BoardInfo(7, 64, 105, Shape.pentagonType11),
+  },
+  [Shape.pentagonType12]: {
+    beginner: new BoardInfo(5, 40, 33, Shape.pentagonType12),
+    intermediate: new BoardInfo(6, 56, 70, Shape.pentagonType12),
+    expert: new BoardInfo(7, 64, 123, Shape.pentagonType12),
+  },
+  // Its lattice leans: a row carries two fifths of a column sideways.
+  [Shape.pentagonType14]: {
+    beginner: new BoardInfo(6, 30, 25, Shape.pentagonType14),
+    intermediate: new BoardInfo(8, 42, 60, Shape.pentagonType14),
+    expert: new BoardInfo(10, 48, 113, Shape.pentagonType14),
+  },
 };
 
 export const PRESET_NAMES = ["beginner", "intermediate", "expert"];

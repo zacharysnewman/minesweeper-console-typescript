@@ -901,11 +901,18 @@ console.log("\narrangements searched for, not written down\n");
   // different, equally valid tiling of four cells with seven. Asserting the
   // known degree here failed on exactly that, and the check was wrong rather
   // than the search.
-  for (const { name, tiling, seeds } of pentagonTilings()) {
+  // Only the four built by hand. The rest were found by the search in the
+  // first place, so asking it to find them again says nothing the replay
+  // check above does not -- and it costs a minute or more a type, which would
+  // make the whole suite unrunnable before a commit.
+  const handBuilt = ["hexagon thirds", "hexagon halves", "house rows", "paired slab"];
+  for (const { name, tiling, seeds } of pentagonTilings().filter((t) =>
+    handBuilt.includes(t.name)
+  )) {
     const cell = tiling.unit[0].map((p) => ({ ...p }));
     // Allowed the seeds that tiling's orbit count needs, and no more: this is
     // a check that the search works, not a hunt for a smaller arrangement.
-    const found = searchArrangement(cell, { maxSeeds: seeds });
+    const found = searchArrangement(cell, { maxSeeds: seeds, milliseconds: 30000 });
     check(`${name}: the search recovers an arrangement for it`, found !== undefined);
     if (found === undefined) continue;
     check(

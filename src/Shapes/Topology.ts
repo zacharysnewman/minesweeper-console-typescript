@@ -6,7 +6,10 @@ import {
   houseRows,
   pairedSlab,
   type10,
+  type11,
+  type12,
   type13,
+  type14,
   type15,
   type2Glide,
   type4Ears,
@@ -166,6 +169,9 @@ const TILING_BUILDERS: Partial<Record<Shape, () => Tiling>> = {
   [Shape.pentagonType10]: type10,
   [Shape.pentagonType13]: type13,
   [Shape.pentagonType15]: type15,
+  [Shape.pentagonType11]: type11,
+  [Shape.pentagonType12]: type12,
+  [Shape.pentagonType14]: type14,
 };
 
 const tilings = new Map<Shape, Tiling>();
