@@ -292,18 +292,40 @@ export function forBoard(layout: Layout, rows: number, cols: number): Layout {
   };
 }
 
+// `content` is the side of the square a cell has the area of.
+//
+// It used to be the diameter of the cell's inscribed circle, on the reasoning
+// that the circle is what the glyph has to fit inside. That sizes for content
+// and not for the board, and the board is what a player sees: at one fixed
+// inscribed circle the cells ranged over twice in area, so the same board at
+// the same setting looked built of noticeably bigger tiles in one tiling than
+// another. Equal area is what reads as equal.
+//
+// It does not equalise the glyph, and nothing can: a long thin cell of a
+// given area holds less text than a compact one of the same area. What the
+// glyph gets is still measured, by fitTextInPolygon, against the outline it
+// has to sit in.
+const INSCRIBED_FOR_AREA: Partial<Record<Shape, number>> = {
+  // A regular hexagon of inscribed diameter d has area (root 3 / 2) d^2, and
+  // an equilateral triangle (3 root 3 / 4) d^2. A square is already d^2.
+  [Shape.hex]: 1 / Math.sqrt(Math.sqrt(3) / 2),
+  [Shape.triangle]: 1 / Math.sqrt((3 * Math.sqrt(3)) / 4),
+};
+
 export function layoutFor(shape: Shape, content: number): Layout {
   const tiling = tilingFor(shape);
   if (tiling !== undefined) {
     return tilingLayout(shape, tiling, content);
   }
+  const forArea = INSCRIBED_FOR_AREA[shape];
+  const inscribed = forArea === undefined ? content : content * forArea;
   switch (shape) {
     case Shape.hex:
-      return hexLayout(content);
+      return hexLayout(inscribed);
     case Shape.triangle:
-      return triangleLayout(content);
+      return triangleLayout(inscribed);
     default:
-      return squareLayout(content);
+      return squareLayout(inscribed);
   }
 }
 
@@ -319,8 +341,11 @@ export function tilingLayout(
   tiling: Tiling,
   content: number
 ): Layout {
-  const inradii = tiling.unit.map((p) => chebyshevCenter(p).radius);
-  const scale = content / 2 / Math.min(...inradii);
+  // Scaled so a cell has the area of a square of side `content`. The cells of
+  // a monohedral tiling are congruent, so one of them settles it.
+  const cellArea =
+    tiling.unit.reduce((sum, p) => sum + areaOf(p), 0) / tiling.unit.length;
+  const scale = content / Math.sqrt(cellArea);
 
   const scaled = tiling.unit.map((polygon) =>
     polygon.map((p) => ({ x: p.x * scale, y: p.y * scale }))
@@ -550,6 +575,14 @@ function inside(point: Point, polygon: Point[]): boolean {
 // only because they are already proven.
 
 // The centroid: the average of the polygon's area, used only to break ties.
+function areaOf(polygon: readonly Point[]): number {
+  let total = 0;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    total += polygon[j].x * polygon[i].y - polygon[i].x * polygon[j].y;
+  }
+  return Math.abs(total) / 2;
+}
+
 export function centroidOf(polygon: readonly Point[]): Point {
   let twiceArea = 0;
   let x = 0;

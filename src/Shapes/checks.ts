@@ -470,6 +470,31 @@ for (const shape of allShapes) {
   }
 }
 
+console.log("\ntiles are the same size in every tiling\n");
+
+{
+  // `content` is the side of the square a cell has the area of, so a board at
+  // a given setting is built of tiles the same size whichever tiling it uses.
+  //
+  // It used to be the diameter of the inscribed circle, which sizes for the
+  // glyph rather than for the board: cells then ranged over twice in area,
+  // and the same board at the same setting looked built of noticeably bigger
+  // tiles in one tiling than another.
+  const side = 30;
+  for (const shape of allShapes) {
+    const layout = layoutFor(shape, side);
+    const tiling = tilingFor(shape);
+    const cells = tiling === undefined ? 2 : tiling.cells;
+    for (let y = 0; y < cells; y++) {
+      const area = polygonArea(layout.polygon(new Coords(0, y)));
+      check(
+        `${shapeName(shape)} cell ${y}: has the area of a ${side}px square`,
+        Math.abs(area - side * side) < 1
+      );
+    }
+  }
+}
+
 console.log("\ncell art fits its outline\n");
 
 for (const shape of allShapes) {

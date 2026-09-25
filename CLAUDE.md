@@ -509,9 +509,25 @@ polygon), which is what makes hit testing correct where the boxes overlap —
 box. Focus is drawn as a stroke on the polygon, since an `outline` would be
 clipped away.
 
-**Size cells by their inscribed circle, not their edge.** A triangle's
-inscribed circle is 0.577 of its side, so a triangle sized like a square
-slices its own glyphs. `layoutFor(shape, content)` takes that diameter.
+**Size cells by their area, not by their inscribed circle.** `content` is the
+side of the square a cell has the area of, so a board at a given setting is
+built of tiles the same size whichever tiling it uses, and `shapes:check`
+pins that.
+
+It used to be the diameter of the inscribed circle, on the reasoning that the
+circle is what a glyph has to fit inside. That sizes for the content and not
+for the board, and the board is what a player sees: at one fixed inscribed
+circle the cells ranged over **twice** in area across the eighteen shapes, and
+the same board at the same setting looked built of noticeably bigger tiles in
+one tiling than another.
+
+Equal area does not give equal glyphs, and nothing can. A long thin cell of a
+given area holds less in its middle than a compact one, so its numbers *and*
+its emoji come out smaller together -- the elongated pentagons draw at about
+half the square's size. That is the shape being honest about itself rather
+than a fault to tune away. What each cell's content gets is still measured
+against the outline it has to sit in, by `fitTextInPolygon`.
+
 Triangle content sits on the **incentre**, a third of the height from the
 base, so an up-pointing cell's glyph rides low and a down-pointing one's rides
 high.
