@@ -1,7 +1,7 @@
 import { Coords } from "../State/Coords";
 import { Point } from "./Point";
 import { Shape } from "./Shape";
-import { pointsUp, TILINGS } from "./Topology";
+import { pointsUp, tilingFor } from "./Topology";
 import { addressOf, polygonAt, Tiling } from "./Tiling";
 
 // A type, so the re-export has to say so: the bundler strips types and would
@@ -30,6 +30,11 @@ export interface Layout {
   // directions, so both are needed to size it.
   boardWidth(rows: number, cols: number): number;
   boardHeight(rows: number, cols: number): number;
+  // The least corner the board reaches. A lattice whose row step carries the
+  // board sideways puts its far rows outside the box the unit alone suggests,
+  // and on the negative side of the origin when it leans left -- where the
+  // page cannot click them. Zero for a lattice that does not lean.
+  boardOrigin(rows: number, cols: number): Point;
   // The cell's bounding box on the board. Cells overlap for hex and triangle,
   // so a renderer that positions boxes absolutely needs this as well as the
   // outline that sits inside it.
@@ -139,6 +144,7 @@ function squareLayout(content: number): Layout {
     cellHeight: s,
     boardWidth: (_rows, cols) => cols * s,
     boardHeight: (rows) => rows * s,
+    boardOrigin: () => ({ x: 0, y: 0 }),
     polygon: (c) => {
       const o = origin(c);
       return [
@@ -187,6 +193,7 @@ function hexLayout(content: number): Layout {
     cellHeight: h,
     boardWidth: (_rows, cols) => cols * colStep + w / 4,
     boardHeight: (rows, cols) => rows * h + (cols > 1 ? h / 2 : 0),
+    boardOrigin: () => ({ x: 0, y: 0 }),
     polygon: (c) => {
       const o = origin(c);
       return [
@@ -236,6 +243,7 @@ function triangleLayout(content: number): Layout {
     cellHeight: h,
     boardWidth: (_rows, cols) => (cols + 1) * colStep,
     boardHeight: (rows) => rows * h,
+    boardOrigin: () => ({ x: 0, y: 0 }),
     polygon: (c) => {
       const o = origin(c);
       return pointsUp(c)
@@ -264,8 +272,28 @@ function triangleLayout(content: number): Layout {
   return layout;
 }
 
+// A layout placed on a board of a given size.
+//
+// Everything a layout draws is written around the unit's own origin, which is
+// enough while the lattice does not lean. When it does, the far rows sit
+// outside that box -- off the left of the page when the row step carries
+// them left, where they render but cannot be clicked. Sliding the whole board
+// by its least corner puts them back, and costs a lattice that does not lean
+// nothing, since its least corner is already zero.
+export function forBoard(layout: Layout, rows: number, cols: number): Layout {
+  const least = layout.boardOrigin(rows, cols);
+  if (Math.abs(least.x) < 1e-9 && Math.abs(least.y) < 1e-9) return layout;
+  const slide = (p: Point): Point => ({ x: p.x - least.x, y: p.y - least.y });
+  return {
+    ...layout,
+    origin: (coords) => slide(layout.origin(coords)),
+    polygon: (coords) => layout.polygon(coords).map(slide),
+    center: (coords) => slide(layout.center(coords)),
+  };
+}
+
 export function layoutFor(shape: Shape, content: number): Layout {
-  const tiling = TILINGS[shape];
+  const tiling = tilingFor(shape);
   if (tiling !== undefined) {
     return tilingLayout(shape, tiling, content);
   }
@@ -363,17 +391,26 @@ export function tilingLayout(
   const indexOf = (coords: Coords): number =>
     addressOf(coords.x, coords.y, tiling).index;
 
-  const extent = (rows: number, cols: number, pick: (b: typeof boxes[0]) => number, axis: "x" | "y") => {
+  // The board's reach along one axis. The offsets are linear in the row and
+  // the unit column, so the extremes sit at the corners and only those need
+  // looking at.
+  const reach = (
+    rows: number,
+    cols: number,
+    pick: (b: typeof boxes[0]) => number,
+    axis: "x" | "y",
+    want: "min" | "max"
+  ) => {
     const unitColumns = Math.max(1, Math.ceil(cols / tiling.cells));
-    let best = -Infinity;
+    let best = want === "max" ? -Infinity : Infinity;
     for (const r of [0, Math.max(0, rows - 1)]) {
       for (const c of [0, Math.max(0, unitColumns - 1)]) {
         for (const box of boxes) {
-          best = Math.max(
-            best,
-            pick(box) + c * (axis === "x" ? across.x : across.y) +
-              r * (axis === "x" ? down.x : down.y)
-          );
+          const at =
+            pick(box) +
+            c * (axis === "x" ? across.x : across.y) +
+            r * (axis === "x" ? down.x : down.y);
+          best = want === "max" ? Math.max(best, at) : Math.min(best, at);
         }
       }
     }
@@ -385,8 +422,16 @@ export function tilingLayout(
     content,
     cellWidth: Math.max(...boxes.map((b) => b.maxX - b.minX)),
     cellHeight: Math.max(...boxes.map((b) => b.maxY - b.minY)),
-    boardWidth: (rows, cols) => extent(rows, cols, (b) => b.maxX, "x"),
-    boardHeight: (rows, cols) => extent(rows, cols, (b) => b.maxY, "y"),
+    boardWidth: (rows, cols) =>
+      reach(rows, cols, (b) => b.maxX, "x", "max") -
+      reach(rows, cols, (b) => b.minX, "x", "min"),
+    boardHeight: (rows, cols) =>
+      reach(rows, cols, (b) => b.maxY, "y", "max") -
+      reach(rows, cols, (b) => b.minY, "y", "min"),
+    boardOrigin: (rows, cols) => ({
+      x: reach(rows, cols, (b) => b.minX, "x", "min"),
+      y: reach(rows, cols, (b) => b.minY, "y", "min"),
+    }),
     origin: (coords) => {
       const o = offsetOf(coords);
       const box = boxes[indexOf(coords)];

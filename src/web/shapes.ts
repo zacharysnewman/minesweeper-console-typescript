@@ -6,7 +6,7 @@ import { Coords } from "../State/Coords";
 import { BoardInfo } from "../Shapes/BoardInfo";
 import { ActivateCellEvent, GenerateBoardEvent } from "../Shapes/ShapeEvents";
 import { ShapeGame } from "../Shapes/ShapeGame";
-import { Shape } from "../Shapes/Shape";
+import { Shape, SHAPES_BY_OPTION } from "../Shapes/Shape";
 import { DEFAULT_PRESET, presetFor, PRESET_NAMES } from "../Shapes/presets";
 import { topologyFor } from "../Shapes/Topology";
 import { layoutFor } from "../Shapes/geometry";
@@ -21,15 +21,6 @@ import { requireElement } from "./dom";
 // there looking like a styled page with no board on it. The watchdog in the
 // HTML covers the case where this module never runs at all.
 
-const SHAPES: Record<string, Shape> = {
-  square: Shape.square,
-  hex: Shape.hex,
-  triangle: Shape.triangle,
-  pentagonThirds: Shape.pentagonThirds,
-  pentagonHalves: Shape.pentagonHalves,
-  pentagonHouses: Shape.pentagonHouses,
-};
-
 // A triangle advances half a cell per column, so it needs a bigger cell to
 // come out legible; a hex is the roomiest for its footprint.
 const PREFERRED_CELL: Record<Shape, number> = {
@@ -39,6 +30,20 @@ const PREFERRED_CELL: Record<Shape, number> = {
   [Shape.pentagonThirds]: 30,
   [Shape.pentagonHalves]: 30,
   [Shape.pentagonHouses]: 30,
+  [Shape.pentagonSlab]: 30,
+  [Shape.pentagonEars]: 30,
+  [Shape.pentagonFan]: 30,
+  [Shape.pentagonGlide]: 30,
+  [Shape.pentagonPairs]: 30,
+  [Shape.pentagonType7]: 30,
+  [Shape.pentagonType8]: 30,
+  [Shape.pentagonType9]: 30,
+  [Shape.pentagonType10]: 30,
+  [Shape.pentagonType13]: 30,
+  [Shape.pentagonType15]: 30,
+  [Shape.pentagonType11]: 30,
+  [Shape.pentagonType12]: 30,
+  [Shape.pentagonType14]: 30,
 };
 
 // Below this a board stops being readable, and scrolling is the better answer
@@ -46,7 +51,7 @@ const PREFERRED_CELL: Record<Shape, number> = {
 const MIN_CELL = 13;
 
 function isShapeName(value: string): boolean {
-  return Object.prototype.hasOwnProperty.call(SHAPES, value);
+  return Object.prototype.hasOwnProperty.call(SHAPES_BY_OPTION, value);
 }
 
 function isPresetName(value: string): boolean {
@@ -84,7 +89,7 @@ function start(): void {
   const note = requireElement("shape-note");
 
   const currentShape = (): Shape =>
-    isShapeName(shapeSelect.value) ? SHAPES[shapeSelect.value] : Shape.square;
+    isShapeName(shapeSelect.value) ? SHAPES_BY_OPTION[shapeSelect.value] : Shape.square;
 
   const currentPreset = (): string =>
     isPresetName(difficultySelect.value)

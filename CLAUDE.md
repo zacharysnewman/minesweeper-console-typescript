@@ -183,6 +183,131 @@ Four things must hold, and each catches something the others miss:
   tiles the plane perfectly well as a *different*, degree-4 tiling. The three
   shipped shapes are permanent fixtures for this reason.
 
+**A pentagon that tiles is one of fifteen types.** `pentagonTypes.ts` carries
+all fifteen sets of angle and edge conditions, so a tiling's type is measured
+rather than claimed — and since there is no sixteenth, a pentagon that tiles
+and matches *nothing* means either the tiling or the conditions are wrong.
+That is a real check, and it has already earned its place: the article's
+labelling sentence reads as though side `a` runs out of vertex A, but it runs
+*into* it (the same sentence says A is opposite d, which only holds the
+second way). Read the wrong way every edge condition sits one place out, and
+a tiling that plainly covered the plane matched none of the fifteen.
+
+**Type 1 has a general construction.** A pentagon with two adjacent angles
+summing to 180° — which is exactly the type 1 condition — pairs with its own
+half turn about the edge between them into a hexagon with a centre of
+symmetry: the two angles make a straight line at each end, so eight corners
+become six. Every centrally symmetric hexagon tiles by translation, so
+`pairedPentagonTiling` turns any type 1 pentagon into a board with no
+arrangement to look up. `squareUp` then puts the lattice on the axes, since
+the natural basis leans and a leaning basis draws a long diagonal in a mostly
+empty box; where the residual drift is a simple fraction of a step, stacking
+that many rows into the unit cancels it exactly.
+
+**An arrangement can be searched for.** A type's conditions say what shape its
+pentagon is; they say nothing about how the copies sit against each other, and
+that is what a board needs. `pentagonShapes.ts` solves the shape -- the five
+angles fix the five edge directions, closing the outline is two more
+equations, and Newton takes it from there, with an unknown allowed to be an
+angle where a type pins its edges too tightly to leave one. `arrange.ts` then
+searches for the arrangement: a unit built by turning copies about a corner or
+an edge midpoint, or by two half turns, and a lattice found for it. The
+lattice is pinned by area -- whatever two vectors span it, the parallelogram
+they make has exactly the area of the unit -- which turns a search over
+vectors into a handful of candidates, each settled by the coverage check.
+
+Two things make the search trustworthy rather than merely productive. It
+recovers all four hand-built tilings, and it **refuses a regular pentagon**,
+which does not tile -- that is the whole point of there being fifteen types.
+
+**One pentagon can tile several ways.** The house is shipped as rows of two
+cells with six neighbours, and the search answers with a different, equally
+valid tiling of four cells with seven. A rediscovery check that asserts the
+known degree fails on that, and the check is what is wrong. Rediscovery
+checks that the arrangement is built from the same cell, covers the plane and
+has symmetric adjacency; the house's second tiling is pinned separately, so
+that the surprise is a fact rather than a failure.
+
+**Searching takes seconds, so what ships is the recipe.** A found arrangement
+carries a `Recipe` -- which centre, what order -- that replays in
+milliseconds at page load, and `shapes:check` runs the full search again and
+fails if the recipe is no longer what it finds. The pentagon is never written
+down either, only its conditions, because a transcription can be wrong in a
+way that still looks like a pentagon and a solved one cannot. The checks also
+demand each solved pentagon measure as its own type *and nothing else*: a
+too-symmetric choice of the free parameters satisfies a neighbouring type's
+conditions too, and then it is not an instance of the type it is named for.
+
+**All fifteen types have boards, and two ideas got the last eleven.**
+
+The first was to enumerate symmetry groups: build a unit as the orbit of one
+or more seed cells under a group of turns, or under a half turn paired with a
+glide, which is pgg. Two numbers off the classification say what a type needs,
+and both are checkable:
+
+    orbits = tiles in the primitive unit / order of the point group
+
+Types 1, 3, 4 and 5 are isohedral and rotation-generated, and a turn family
+alone reaches exactly those. Type 2 is isohedral but pgg: its one orbit holds
+mirror images no turn produces, and a flip is the whole of what it needed.
+Type 6 is p2 with a four-cell unit -- the same group and the same size the
+plain half-turn family builds -- and out of reach all the same, because those
+four cells are *two* orbits; it needed a second seed. Neither the group nor
+the size was ever the obstacle.
+
+The second idea is that enumeration runs out. A tiling whose tiles fall into
+several orbits need not put its turning centres anywhere on the cell, so there
+is nothing left to enumerate. What can always be done is to **tile**: take an
+uncovered spot against the patch so far, try every way of covering it, carry
+on, backtrack when stuck -- and then look for the translations that carry the
+patch into itself. The lattice is measured from the tiling rather than assumed
+from a group. Every unit size it finds matches the classification.
+
+Four things had to be right, and each was wrong first:
+
+- **Take the unit from the middle of the patch outwards**, skipping a cell
+  that lands on one already taken. A patch grown a cell at a time is periodic
+  in its middle and ragged at its edge; demanding that every cell reduce into
+  exactly these classes threw away lattices that were right.
+- **Build placements the way the replay does.** Deriving one in the reference
+  cell's frame and carrying it over with the base's own motion is faster and
+  is wrong: composing with a base that has been turned over flips the
+  placement too, so the same record meant one thing to the search and another
+  to the replay. Types 7 and 9 were lost to this and it looked like a search
+  failure.
+- **Ask for a periodic patch, not the first one that packs.** The fill stops
+  at the first arrangement that fits, and for some types that arrangement
+  wanders -- it fills the plane locally and never comes round to itself.
+- **A cell may need a corner-anchored placement**: one corner on an existing
+  corner, turned to line up with an existing edge, and the rest of it landing
+  part way along its neighbours' edges. Most of the fifteen are not edge to
+  edge, and types 11, 12 and 14 cannot be built without this -- laying by
+  whole edges alone, every branch reached an unfillable gap at about nine
+  cells. Sliding a copy a fixed distance along an edge was tried first and
+  reached none of them.
+
+**Bound a search by time, not by work.** The node budget stopped bounding how
+long the fill runs the moment corner-anchored placements made a node a hundred
+times more expensive, and `shapes:check` went from a minute to over ten.
+
+**Recipes are verified by replaying them, not by searching again.** A recipe
+says how copies were laid, so replaying it either reproduces a tiling of that
+same pentagon or it does not, and coverage, symmetric adjacency and the cell
+count say which -- in milliseconds. Re-running the search costs a minute a
+type and, for a patch, checks the order a depth-first search happened to take
+rather than anything about the tiling. Rediscovery is kept for the four
+tilings that were built by hand, where it means something, along with the
+regular pentagon the search must refuse.
+
+**Tilings are built when first asked for.** A dozen of them at import was most
+of a second before the page drew anything, and a page plays one shape at a
+time.
+
+**A lattice may lean, and then the board is not a rectangle.** Layouts report
+the least corner a board of a given size reaches, and `forBoard` slides the
+board back by it. Without that, a lattice whose row step carries left renders
+its far rows at negative coordinates, where they can be seen and not clicked.
+
 **Contact is not corner-to-corner.** Most pentagon tilings are not edge to
 edge: one cell's corner lands part way along another's edge, and there no
 corners coincide at all. `polygonsTouch` asks whether a corner lies anywhere

@@ -1,6 +1,24 @@
 import { Coords } from "../State/Coords";
 import { Shape } from "./Shape";
-import { hexagonHalves, hexagonThirds, houseRows } from "./pentagons";
+import {
+  hexagonHalves,
+  hexagonThirds,
+  houseRows,
+  pairedSlab,
+  type10,
+  type11,
+  type12,
+  type13,
+  type14,
+  type15,
+  type2Glide,
+  type4Ears,
+  type5Fan,
+  type6Pairs,
+  type7,
+  type8,
+  type9,
+} from "./pentagons";
 import { addressOf, columnOf, deriveOffsets, Tiling } from "./Tiling";
 
 // A tiling's adjacency, and nothing else.
@@ -132,27 +150,62 @@ export function topologyFromTiling(shape: Shape, tiling: Tiling): Topology {
 }
 
 // The tilings that are given as geometry instead of as an offset table.
-export const TILINGS: Partial<Record<Shape, Tiling>> = {
-  [Shape.pentagonThirds]: hexagonThirds,
-  [Shape.pentagonHalves]: hexagonHalves,
-  [Shape.pentagonHouses]: houseRows,
+//
+// Thunks, not tilings: building one means solving a pentagon and replaying
+// how its copies were laid, and a page plays one shape at a time. Asking for
+// all of them at import cost most of a second before anything was drawn.
+const TILING_BUILDERS: Partial<Record<Shape, () => Tiling>> = {
+  [Shape.pentagonThirds]: () => hexagonThirds,
+  [Shape.pentagonHalves]: () => hexagonHalves,
+  [Shape.pentagonHouses]: () => houseRows,
+  [Shape.pentagonSlab]: () => pairedSlab,
+  [Shape.pentagonEars]: type4Ears,
+  [Shape.pentagonFan]: type5Fan,
+  [Shape.pentagonGlide]: type2Glide,
+  [Shape.pentagonPairs]: type6Pairs,
+  [Shape.pentagonType7]: type7,
+  [Shape.pentagonType8]: type8,
+  [Shape.pentagonType9]: type9,
+  [Shape.pentagonType10]: type10,
+  [Shape.pentagonType13]: type13,
+  [Shape.pentagonType15]: type15,
+  [Shape.pentagonType11]: type11,
+  [Shape.pentagonType12]: type12,
+  [Shape.pentagonType14]: type14,
 };
 
-const topologies: Record<Shape, Topology> = {
+const tilings = new Map<Shape, Tiling>();
+
+export function tilingFor(shape: Shape): Tiling | undefined {
+  const already = tilings.get(shape);
+  if (already !== undefined) return already;
+  const build = TILING_BUILDERS[shape];
+  if (build === undefined) return undefined;
+  const tiling = build();
+  tilings.set(shape, tiling);
+  return tiling;
+}
+
+// Hand tables for the first three; everything else is derived from its
+// tiling the first time that shape is played.
+const handmade: Partial<Record<Shape, Topology>> = {
   [Shape.square]: square,
   [Shape.hex]: hex,
   [Shape.triangle]: triangle,
-  [Shape.pentagonThirds]: topologyFromTiling(
-    Shape.pentagonThirds,
-    hexagonThirds
-  ),
-  [Shape.pentagonHalves]: topologyFromTiling(
-    Shape.pentagonHalves,
-    hexagonHalves
-  ),
-  [Shape.pentagonHouses]: topologyFromTiling(Shape.pentagonHouses, houseRows),
 };
 
+const derived = new Map<Shape, Topology>();
+
 export function topologyFor(shape: Shape): Topology {
-  return topologies[shape];
+  const hand = handmade[shape];
+  if (hand !== undefined) return hand;
+  const already = derived.get(shape);
+  if (already !== undefined) return already;
+  const tiling = tilingFor(shape);
+  if (tiling === undefined) {
+    throw new Error(`no topology for shape ${shape}`);
+  }
+  const topology = topologyFromTiling(shape, tiling);
+  derived.set(shape, topology);
+  return topology;
 }

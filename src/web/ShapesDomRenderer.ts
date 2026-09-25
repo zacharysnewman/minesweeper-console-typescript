@@ -4,7 +4,7 @@ import { Tile } from "../State/Tile";
 import { TileState } from "../State/TileState";
 import { WinLoseStatus } from "../State/WinLoseStatus";
 import { winLoseCheck } from "../State/winLoseCheck";
-import { layoutFor, Layout } from "../Shapes/geometry";
+import { forBoard, layoutFor, Layout } from "../Shapes/geometry";
 import { Shape } from "../Shapes/Shape";
 import { ShapeState } from "../Shapes/ShapeState";
 import { ShapeStateChangedEvent } from "../Shapes/ShapeEvents";
@@ -326,7 +326,7 @@ export class ShapesDomRenderer {
       return;
     }
 
-    const layout = layoutFor(shape, this.content);
+    const layout = forBoard(layoutFor(shape, this.content), rows, cols);
     this.layout = layout;
 
     const { board } = this.elements;

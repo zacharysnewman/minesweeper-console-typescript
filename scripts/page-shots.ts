@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { chromium, Browser, Page } from "playwright";
+import { allShapes, shapeOption } from "../src/Shapes/Shape";
 
 // Drives the real page and photographs it, rather than photographing a
 // specimen of its parts. Runs against the built site so what is checked is
@@ -200,7 +201,9 @@ async function main(): Promise<void> {
     problems.push("shapes: the face button is empty");
   }
 
-  for (const shape of ["square", "hex", "triangle", "pentagonThirds", "pentagonHalves", "pentagonHouses"]) {
+  // Driven from allShapes, not a list written out here: a shape added to the
+  // game and left out of this loop would never be played or photographed.
+  for (const shape of allShapes.map(shapeOption)) {
     for (const size of ["beginner", "expert"]) {
       problems.push(...(await shoot(page, site.url, shape, size)));
     }
